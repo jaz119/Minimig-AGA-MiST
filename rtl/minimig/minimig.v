@@ -249,7 +249,7 @@ module minimig
     input   [15:0]aux_right_2,		// Auxiliary audio channels
 	//user i/o
   output  [3:0] cpu_config,
-  output  [5:0] board_configured,
+  output  [6:0] board_configured,
   output  turbochipram,
   output  turbokick,
   output  [1:0] slow_config,
@@ -354,6 +354,7 @@ wire		sel_cia_b;				//cia B select
 wire		sel_rtc;      // RTC select
 wire		sel_toccata; // Toccata sound card select
 wire		sel_control; // Control board select
+wire		sel_xsurf;   // X-Surf card
 wire		sel_autoconfig;
 wire		int2;					//intterrupt 2
 wire		int3;					//intterrupt 3 
@@ -1085,8 +1086,9 @@ assign _cpu_ipl = int7 ? 3'b000 : _iplx;	//m68k interrupt request
 assign cpu_data_in2 = chip48[47:32];
 
 wire [7:0] toccata_base_addr; // IO base address for Toccata card
-wire [7:0] control_base_addr; // IO base address for control card
-wire [5:0] board_configured_i;// IO board configured
+wire [7:0] control_base_addr; // IO base address for Control card
+wire [7:0] xsurf_base_addr;   // IO base address for X-Surf card
+wire [6:0] board_configured_i;// IO board configured
 
 wire sel_drivesounds;
 //instantiate gary
@@ -1133,6 +1135,7 @@ gary GARY1
 	.sel_rtc(sel_rtc),
 	.sel_toccata(sel_toccata),
 	.sel_control(sel_control),
+	.sel_xsurf(sel_xsurf),
 	.sel_ide(sel_ide),
 	.sel_gayle(sel_gayle),
 	.sel_autoconfig(sel_autoconfig),
@@ -1140,7 +1143,8 @@ gary GARY1
 	// Auto config IO BASE
 	.board_configured(board_configured_i),
 	.toccata_base_addr(toccata_base_addr),
-	.control_base_addr(control_base_addr)
+	.control_base_addr(control_base_addr),
+	.xsurf_base_addr(xsurf_base_addr)
 );
 
 gayle GAYLE1
@@ -1230,8 +1234,10 @@ localparam MMCB = 1'b1;
 localparam MMCB = 1'b0;
 `endif
 
-minimig_autoconfig#(.TOCCATA_SND(MMTOC),.CONTROL_BOARD(MMCB)) autoconfig
-(
+minimig_autoconfig #(
+	.TOCCATA_SND(MMTOC),
+	.CONTROL_BOARD(MMCB)
+) autoconfig (
 	.clk(clk),
 	.clk7_en(clk7_en),
 	.reset(reset),
@@ -1250,7 +1256,8 @@ minimig_autoconfig#(.TOCCATA_SND(MMTOC),.CONTROL_BOARD(MMCB)) autoconfig
 	.board_shutup(),
 	.autoconfig_done(),
 	.toccata_base_addr(toccata_base_addr),
-	.control_base_addr(control_base_addr)
+	.control_base_addr(control_base_addr),
+	.xsurf_base_addr(xsurf_base_addr)
 );
 
 assign board_configured = board_configured_i;

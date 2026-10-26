@@ -179,7 +179,7 @@ wire [ 16-1:0] tg68_cout;
 wire [ 16-1:0] tg68_cin;
 wire           tg68_cpuena;
 wire [  4-1:0] cpu_config;
-wire     [4:0] board_configured;
+wire     [6:0] board_configured;
 wire           turbochipram;
 wire           turbokick;
 wire     [1:0] slow_config;

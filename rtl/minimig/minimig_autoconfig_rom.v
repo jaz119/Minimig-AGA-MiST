@@ -31,7 +31,7 @@ begin
 	// with a NULL board at 11 to terminate the chain.
 
 	// Up to 8 meg of 24-bit Fast RAM
-	
+
 	ram[z2base+'h0] = 4'b1110;	// Zorro-II card, add mem, no ROM
 	ram[z2base+'h2/2] = 4'b0000;	// 0110 => 2MB, 0111 => 4MB, 0000 => 8MB
 	ram[z2base+'h10/2] = 4'b1110;	// Manufacturer ID: 0x139c
@@ -40,7 +40,6 @@ begin
 	ram[z2base+'h16/2] = 4'b0011;
 	ram[z2base+'h26/2] = 4'b1110;	// Serial no: 1
 
-	
 	// 16 or 64 meg of 32-bit Fast RAM
 
 	ram[z3base+'h0] = 4'b1010;	// Zorro-III card, add mem, no ROM
@@ -53,8 +52,7 @@ begin
 	ram[z3base+'h14/2] = 4'b0110;
 	ram[z3base+'h16/2] = 4'b0011;
 	ram[z3base+'h26/2] = 4'b1101;	// Serial no: 2
-	
-	
+
 	// Extra 32 meg of RAM for 64-meg platforms
 
 	ram[z3base2+'h0] = 4'b1010;	// Zorro-III card, add mem, no ROM
@@ -69,11 +67,10 @@ begin
 	ram[z3base2+'h16/2] = 4'b0110;
 	ram[z3base2+'h26/2] = 4'b1011;	// Serial no: 4
 
-
 	// 2 or 4 meg of 32-bit Fast RAM (unused RAM in Bank 0)
 
 	ram[z3base3+'h0] = 4'b1010;	// Zorro-III card, add mem, no ROM
-	ram[z3base+'h2/2] = 4'b0000;	// 8MB (extended to 16 in reg 08, actual size specified in reg 0a)
+	ram[z3base3+'h2/2] = 4'b0000;	// 8MB (extended to 16 in reg 08, actual size specified in reg 0a)
 	ram[z3base3+'h4/2] = 4'b1110;	// ProductID = 0x11
 	ram[z3base3+'h6/2] = 4'b1110;	// ProductID = 0x11
 	ram[z3base3+'h8/2] = 4'b0010;	// Memory card, not silenceable, reserved
@@ -84,19 +81,19 @@ begin
 	ram[z3base3+'h16/2] = 4'b0110;
 	ram[z3base3+'h26/2] = 4'b1100;	// Serial no: 3
 
+	// X-Surf ethernet card
 
-	// Ethernet
-	
-	ram[ethbase+'h0] = 4'b1000;	// Zorro-III card, no link, no ROM
-	ram[ethbase+'h2/2] = 4'b0001;	// Next board not related, size 'h40k
-	ram[ethbase+'h4/2] = 4'b1101;	// ProductID = 0x20 (only setting upper nybble)
-	ram[ethbase+'h8/2] = 4'b1110;	// Not memory, silenceable, normal size, Zorro III
-	ram[ethbase+'ha/2] = 4'b1101;	// logical size 'h40k
-	ram[ethbase+'h10/2] = 4'b1110;	// Manufacturer ID: 0x139c
-	ram[ethbase+'h12/2] = 4'b1100;
-	ram[ethbase+'h14/2] = 4'b0110;
-	ram[ethbase+'h16/2] = 4'b0011;
-	ram[ethbase+'h26/2] = 4'b1100;	// Serial no: 3
+	ram[ethbase+'h0] = 4'b1100;    // Zorro-II card, no link, no ROM
+	ram[ethbase+'h2/2] = 4'b0001;  // Next board not related, size 'h40k
+	ram[ethbase+'h4/2] = 4'b1110;  // ProductID = 0x17 (X-Surf)
+	ram[ethbase+'h6/2] = 4'b1000;  // ProductID = 0x17 (X-Surf)
+	ram[ethbase+'h8/2] = 4'b1111;  // Flags (Not memory)
+	ram[ethbase+'ha/2] = 4'b1111;  // logical size matches physical size
+	ram[ethbase+'h10/2] = 4'b1110; // Manufacturer ID: 0x1212 (Individual Computers)
+	ram[ethbase+'h12/2] = 4'b1101;
+	ram[ethbase+'h14/2] = 4'b1110;
+	ram[ethbase+'h16/2] = 4'b1101;
+	ram[ethbase+'h26/2] = 4'b1001; // Serial no: 6
 
 	// Toccata sound card
 
@@ -109,7 +106,7 @@ begin
 	ram[sndbase+'h12/2] = 4'b1000;
 	ram[sndbase+'h14/2] = 4'b1010;
 	ram[sndbase+'h16/2] = 4'b1011;
-	
+
 	// Minimig Control board
 
 	ram[ctrlbase+'h0] = 4'b1100;    // Zorro-II card, no link, no ROM
