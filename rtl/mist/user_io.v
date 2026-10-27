@@ -29,6 +29,21 @@ module user_io(
 
 	output [63:0] RTC,
 
+	// ethernet interface
+	input [31:0]  eth_status,
+
+	output reg          eth_mac_begin,
+	output reg          eth_mac_strobe,
+	output reg    [7:0] eth_mac_byte,
+
+	output reg          eth_tx_read_begin,
+	output reg          eth_tx_read_strobe,
+	input         [7:0] eth_tx_read_byte,
+
+	output reg          eth_rx_write_begin,
+	output reg          eth_rx_write_strobe,
+	output reg    [7:0] eth_rx_write_byte,
+
 	// i2c bridge
 	output reg          i2c_start,
 	output reg          i2c_read,
@@ -41,11 +56,13 @@ module user_io(
 	input               hdmi_hiclk // HDMI PCLK > 80 MHz
 );
 
+wire spi_sck = SPI_CLK;
+
 reg [6:0]     sbuf;
 reg [7:0]     cmd;
-reg [2:0] 	  bit_cnt;    // counts bits 0-7 0-7 ...
-reg [9:0]     byte_cnt;   // counts bytes
-reg [7:0] 	  but_sw;
+reg [3:0]     bit_cnt;    // counts bits 0-7 8-15 8-15 ...
+reg [3:0]     byte_cnt;   // counts bytes
+reg [7:0]     but_sw;
 reg [7:0]     status;
 
 reg           kbd_mouse_strobe;
@@ -83,29 +100,33 @@ assign CONF     = but_sw[7:4];
 assign STATUS   = status;
 
 // SPI bit and byte counters
-always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
-	if(SPI_SS_IO == 1) begin
-		bit_cnt <= 0;
-		byte_cnt <= 0;
+always @(posedge spi_sck or posedge SPI_SS_IO) begin
+	if (SPI_SS_IO == 1) begin
+		bit_cnt <= 4'd0;
+		byte_cnt <= 4'd0;
 	end else begin
-		if((bit_cnt == 7)&&(~&byte_cnt)) 
-			byte_cnt <= byte_cnt + 8'd1;
-
-		bit_cnt <= bit_cnt + 1'd1;
+		// count 0-7 8-15 8-15 ...
+		if (bit_cnt != 4'd15)
+			bit_cnt <= bit_cnt + 4'd1;
+		else begin
+			bit_cnt <= 4'd8;
+			if (~&byte_cnt)
+				byte_cnt <= byte_cnt + 4'd1;
+		end
 	end
 end
 
 reg [7:0] spi_byte_out;
 
-always@(negedge SPI_CLK or posedge SPI_SS_IO) begin : spi_byteout
+always @(negedge spi_sck or posedge SPI_SS_IO) begin : spi_byteout
 	if(SPI_SS_IO == 1) begin
 		SPI_MISO <= 1'bZ;
 	end else begin
-		SPI_MISO <= spi_byte_out[~bit_cnt];
+		SPI_MISO <= spi_byte_out[~bit_cnt[2:0]];
 	end
 end
 
-always@(posedge SPI_CLK or posedge SPI_SS_IO) begin : spi_transmitter
+always @(posedge spi_sck or posedge SPI_SS_IO) begin : spi_transmitter
 
 	if(SPI_SS_IO == 1) begin
 		spi_byte_out <= CORE_TYPE;
@@ -114,8 +135,19 @@ always@(posedge SPI_CLK or posedge SPI_SS_IO) begin : spi_transmitter
 		if(bit_cnt == 7) begin
 			if(!byte_cnt) cmd <= {sbuf, SPI_MOSI};
 
-			spi_byte_out <= 0;
+			spi_byte_out <= 8'd0;
 			case({(!byte_cnt) ? {sbuf, SPI_MOSI} : cmd})
+
+			// ethernet status
+			8'h0a: begin
+				spi_byte_out <= eth_status[((byte_cnt-1)<<3) +:8];
+			end
+
+			// read ethernet tx buffer
+			8'h0b: begin
+				spi_byte_out <= eth_tx_read_byte;
+			end
+
 			// i2c
 			8'h31:
 				if (byte_cnt == 0) spi_byte_out <= {5'd0, hdmi_hiclk, i2c_ack, i2c_end};
@@ -133,20 +165,41 @@ reg       spi_transfer_end_r = 1;
 reg [7:0] spi_byte_in;
 
 // Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
-always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
-
-	if(SPI_SS_IO == 1) begin
+always @(posedge spi_sck or posedge SPI_SS_IO) begin
+	if (SPI_SS_IO == 1) begin
 		spi_transfer_end_r <= 1;
+		eth_tx_read_begin <= 1'b0;
+		eth_tx_read_strobe <= 1'b0;
+
 	end else begin
 		spi_transfer_end_r <= 0;
 
-		if(bit_cnt != 7)
-			sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
-
-		// finished reading a byte, prepare to transfer to clk_sys
-		if(bit_cnt == 7) begin
-			spi_byte_in <= { sbuf, SPI_MOSI};
+		// command byte finished
+		if (bit_cnt == 7) begin
+			spi_byte_in <= { sbuf, SPI_MOSI };
 			spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
+
+			if ({ sbuf, SPI_MOSI } == 8'h0b) begin
+				eth_tx_read_begin <= 1'b1;
+				eth_tx_read_strobe <= 1'b0;
+			end
+		end
+
+		sbuf[6:1] <= sbuf[5:0];
+		sbuf[0] <= SPI_MOSI;
+
+		if (eth_tx_read_strobe && bit_cnt == 9) begin
+			eth_tx_read_strobe <= 1'b0;
+		end
+
+		// payload byte finished
+		if (bit_cnt == 15) begin
+			spi_byte_in <= { sbuf, SPI_MOSI };
+			spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
+
+			// give strobe after each eth byte read
+			if (cmd == 8'h0b)
+				eth_tx_read_strobe <= 1'b1;
 		end
 	end
 end
@@ -171,9 +224,14 @@ always @(posedge clk_sys) begin
 	kbd_mouse_strobe <= 0;
 
 	i2c_start <= 0;
+	eth_mac_begin <= 1'b0;
+	eth_mac_strobe <= 1'b0;
+	eth_rx_write_strobe <= 1'b0;
 
 	if (spi_transfer_end) begin
 		abyte_cnt <= 8'd0;
+		eth_mac_begin <= 1'b0;
+		eth_rx_write_begin <= 1'b0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(~&abyte_cnt) 
@@ -188,16 +246,18 @@ always @(posedge clk_sys) begin
 				end
 				8'h05: kbd_mouse_type <= 2'b10;  // keyboard
 		 		8'h06: kbd_mouse_type <= 2'b11;  // OSD keyboard
+		 		8'h09: eth_mac_begin <= 1'b1;
+		 		8'h0c: eth_rx_write_begin <= 1'b1;
 			endcase
 		end else begin
 			case(acmd)
 				// buttons and switches
 				8'h01: but_sw <= spi_byte_in;
-				8'h60: if (abyte_cnt < 5) joystick_0[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
-				8'h61: if (abyte_cnt < 5) joystick_1[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
-				8'h62: if (abyte_cnt < 5) joystick_2[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
-				8'h63: if (abyte_cnt < 5) joystick_3[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
-				8'h64: if (abyte_cnt < 5) joystick_4[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h60: if (abyte_cnt < 5) joystick_0[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h61: if (abyte_cnt < 5) joystick_1[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h62: if (abyte_cnt < 5) joystick_2[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h63: if (abyte_cnt < 5) joystick_3[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h64: if (abyte_cnt < 5) joystick_4[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
 				8'h70, 8'h71:
 				begin
 					if (abyte_cnt == 8'd1) begin
@@ -229,6 +289,16 @@ always @(posedge clk_sys) begin
 					kbd_mouse_strobe <= 1;
 					kbd_mouse_strobe_level <= ~kbd_mouse_strobe_level;
 				end
+				// send mac address byte to ethernet controller
+				8'h09: begin
+					eth_mac_byte <= spi_byte_in;
+					eth_mac_strobe <= 1'b1;
+				end
+				// send received byte to ethernet controller
+				8'h0c: begin
+					eth_rx_write_byte <= spi_byte_in;
+					eth_rx_write_strobe <= 1'b1;
+				end
 				// joystick analog
 				8'h1a: begin
 					// first byte is joystick index
@@ -248,7 +318,7 @@ always @(posedge clk_sys) begin
 							JOY_ANA1[7:0] <= {~spi_byte_in[7], spi_byte_in[6:0]};
 					end
 				end
-				8'h22: if (abyte_cnt < 9) rtc[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h22: if (abyte_cnt < 9) rtc[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
 				8'h15: status <= spi_byte_in;
 				// I2C bridge
 				8'h30: if(abyte_cnt == 1) {i2c_addr, i2c_read} <= spi_byte_in;
@@ -260,4 +330,3 @@ always @(posedge clk_sys) begin
 end
 
 endmodule
-
