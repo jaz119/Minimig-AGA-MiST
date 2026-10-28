@@ -302,9 +302,10 @@ wire		[15:0] user_data_out;	//user IO data out
 wire		[15:0] gary_data_out;	//data out from memory bus multiplexer
 wire		[15:0] gayle_data_out;	//Gayle data out
 wire		[15:0] cia_data_out;	//cia A+B data bus out
-wire		[15:0] toc_data_out; //Toccata sound card data out
-wire		[15:0] ctrl_data_out; //Toccata sound card data out
-wire		[15:0] rtc_data_out;  //RTC data out
+wire		[15:0] toc_data_out;	//Toccata sound card data out
+wire		[15:0] ctrl_data_out;	//Control card data out
+wire		[15:0] xsurf_data_out;	//X-Surf ethernet card data out
+wire		[15:0] rtc_data_out;	//RTC data out
 wire		[15:0] ar3_data_out;	//Action Replay data out
 
 //local signals for spi bus
@@ -351,15 +352,16 @@ wire		sel_cia;				//CIA address space
 wire		sel_reg;				//chip register select
 wire		sel_cia_a;				//cia A select
 wire		sel_cia_b;				//cia B select
-wire		sel_rtc;      // RTC select
-wire		sel_toccata; // Toccata sound card select
-wire		sel_control; // Control board select
-wire		sel_xsurf;   // X-Surf card
+wire		sel_rtc;				//RTC select
+wire		sel_toccata;			//Toccata sound card select
+wire		sel_control;			//Control board select
+wire		sel_xsurf;				//X-Surf card
 wire		sel_autoconfig;
 wire		int2;					//intterrupt 2
 wire		int3;					//intterrupt 3 
 wire		int6;					//intterrupt 6
-wire		int6_toc;			//intterrupt 6
+wire		int6_toc;				//intterrupt 6
+wire		int2_xsurf;				//intterrupt 2
 wire		[7:0] osd_ctrl;			//OSD control
 wire    kb_lmb;
 wire    kb_rmb;
@@ -630,7 +632,7 @@ paula PAULA1
 	.sof(sof),
   .strhor(strhor_paula),
   .vblint(vbl_int),
-	.int2(int2|gayle_irq|ext_int2),
+	.int2(int2|gayle_irq|ext_int2|int2_xsurf),
 	.int3(int3),
 	.int6(int6|ext_int6|int6_toc),
 	._ipl(_iplx),
@@ -715,7 +717,7 @@ end
 
 //instantiate user IO
 userio USERIO1 
-(	
+(
 	.clk(clk),
   .clk7_en(clk7_en),
   .clk7n_en(clk7n_en),
@@ -799,7 +801,7 @@ debug DEBUG1 (
 
 //instantiate Denise
 denise DENISE1
-(		
+(
   .clk(clk),
   .clk7_en(clk7_en),
   .c1(c1),
@@ -824,7 +826,7 @@ denise DENISE1
 
 //instantiate Amber
 amber AMBER1
-(		
+(
 	.clk(clk),
 	.dblscan(_15khz && !varbeamen),
 	.varbeamen(varbeamen),
@@ -1048,6 +1050,7 @@ minimig_sram_bridge RAM1
 );
 
 `ifdef MINIMIG_HRTMON_CART
+
 cart CART1
 (
   .clk            (clk            ),
@@ -1073,11 +1076,14 @@ cart CART1
 //  .aron           (aron           ),
   .cpuhlt         (cpuhlt         )
 );
+
 `else
+
 	assign sel_cart = 1'b0;
 	assign cart_data_out = 16'h0000;
 	assign int7 = 1'b0;
 	assign ovr = 1'b0;
+
 `endif
 
 //level 7 interrupt for CPU
@@ -1340,6 +1346,39 @@ assign track_vsync=1'b0;
 
 `endif
 
+`ifdef MINIMIG_XSURF
+
+xsurf xsurf_eth
+(
+  .clk(clk),
+  .rst(reset),
+  .sel(sel_xsurf),
+  .cpu_rd(cpu_rd),
+  .cpu_hwr(cpu_hwr),
+  .cpu_lwr(cpu_lwr),
+  .addr(cpu_address_out[15:1]),
+  .din(cpu_data_out),
+  .dout(xsurf_data_out),
+  .int2(int2_xsurf),
+  .status(eth_status),
+  .mac_begin(eth_mac_begin),
+  .mac_strobe(eth_mac_strobe),
+  .mac_byte(eth_mac_byte),
+  .tx_begin(eth_tx_read_begin),
+  .tx_strobe(eth_tx_read_strobe),
+  .tx_byte(eth_tx_read_byte),
+  .rx_begin(eth_rx_write_begin),
+  .rx_strobe(eth_rx_write_strobe),
+  .rx_byte(eth_rx_write_byte)
+);
+
+`else
+
+  assign int2_xsurf = 1'b0;
+  assign xsurf_data_out = 16'h0000;
+
+`endif
+
 // Mix the Paula, CDDA, Toccata and auxiliary audio data
 
 AudioMix tocAudioMix
@@ -1375,19 +1414,19 @@ AudioMix tocAudioMix
 
 //data multiplexer
 assign cpu_data_in[15:0] = gary_data_out[15:0]
-						 | cia_data_out[15:0]
-						 | gayle_data_out[15:0]
-             | cart_data_out[15:0]
-             | rtc_data_out
-				 | toc_data_out[15:0]
-				 | ctrl_data_out
-				 | autoconfig_data_out;
+			| cia_data_out[15:0]
+			| gayle_data_out[15:0]
+			| cart_data_out[15:0]
+			| rtc_data_out
+			| toc_data_out[15:0]
+			| ctrl_data_out
+			| xsurf_data_out[15:0]
+			| autoconfig_data_out;
 
 assign custom_data_out[15:0] = agnus_data_out[15:0]
-							 | paula_data_out[15:0]
-							 | denise_data_out[15:0]
-							 | user_data_out[15:0];
-
+			| paula_data_out[15:0]
+			| denise_data_out[15:0]
+			| user_data_out[15:0];
 
 //--------------------------------------------------------------------------------------
 

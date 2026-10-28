@@ -93,7 +93,7 @@ begin
 	ram[ethbase+'h12/2] = 4'b1101;
 	ram[ethbase+'h14/2] = 4'b1110;
 	ram[ethbase+'h16/2] = 4'b1101;
-	ram[ethbase+'h26/2] = 4'b1001; // Serial no: 6
+	ram[ethbase+'h26/2] = 4'b1111; // Serial no: 0
 
 	// Toccata sound card
 
