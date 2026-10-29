@@ -5,35 +5,28 @@
 
 module xsurf
 (
-    input             clk,        // bus clock
-    input             rst,        // system reset
-    input             sel,        // card select
-    input             cpu_rd,     // cpu read enable
-    input             cpu_hwr,    // high byte write enable
-    input             cpu_lwr,    // low byte writes enable
-    input      [15:1] addr,       // address bus (word aligned)
-    input      [15:0] din,        // data bus
-    output reg [15:0] dout,       // data bus
-    output            int2,       // interrupt request
-
-    // ethernet status word to be read by i/o controller
-    output     [31:0] status,
-
-    // interface to allow MAC address being set by i/o controller
-    input             mac_begin,  // rising edge before new mac is sent
-    input             mac_strobe, // rising edge before each mac byte
-    input       [7:0] mac_byte,   // mac address byte
-
-    // interface to allow the i/o controller to read frames from the tx buffer
-    input             tx_begin,   // rising edge before new tx byte stream is sent
-    input             tx_strobe,  // rising edge before each tx byte
-    output      [7:0] tx_byte,    // byte from transmit buffer 
-
-    // interface to allow the i/o controller to write frames to the rx buffer
-    input             rx_begin,   // rising edge before new rx byte stream is sent
-    input             rx_strobe,  // rising edge before each rx byte
-    input       [7:0] rx_byte     // byte to be written to rx buffer 
+    input             clk,
+    input             rst,
+    input             sel,                  // card select
+    input             cpu_rd,               // cpu read enable
+    input             cpu_hwr,              // high byte write enable
+    input             cpu_lwr,              // low byte writes enable
+    input      [15:1] addr,                 // address bus (word aligned)
+    input      [15:0] din,
+    output reg [15:0] dout,
+    output            int2,                 // interrupt request
+    output     [31:0] eth_status,           // ethernet nic status
+    input             eth_mac_begin,
+    input             eth_mac_strobe,
+    input       [7:0] eth_mac_byte,
+    input             eth_tx_read_begin,
+    input             eth_tx_read_strobe,
+    output      [7:0] eth_tx_read_byte,
+    input             eth_rx_write_begin,
+    input             eth_rx_write_strobe,
+    input       [7:0] eth_rx_write_byte
 );
+
     localparam ETH_BASE = 16'h8600;
     wire sel_eth = sel && (addr[15:6] == ETH_BASE[15:6]);
 
@@ -56,7 +49,7 @@ module xsurf
     end
 
     // all transactions are 16-bit only
-    rtl8019 rtl8019_isa
+    rtl8019 rtl8019_eth
     (
         .clk(clk),
         .rst(rst),
@@ -67,20 +60,20 @@ module xsurf
         .din(din),
         .dout(eth_dout),
 
-        .int(int2),
-        .status(status),
+        .irq(int2),
+        .status(eth_status),
 
-        .mac_begin(mac_begin),
-        .mac_strobe(mac_strobe),
-        .mac_byte(mac_byte),
+        .mac_begin(eth_mac_begin),
+        .mac_strobe(eth_mac_strobe),
+        .mac_byte(eth_mac_byte),
 
-        .tx_begin(tx_begin),
-        .tx_strobe(tx_strobe),
-        .tx_byte(tx_byte),
+        .tx_begin(eth_tx_read_begin),
+        .tx_strobe(eth_tx_read_strobe),
+        .tx_byte(eth_tx_read_byte),
 
-        .rx_begin(rx_begin),
-        .rx_strobe(rx_strobe),
-        .rx_byte(rx_byte)
+        .rx_begin(eth_rx_write_begin),
+        .rx_strobe(eth_rx_write_strobe),
+        .rx_byte(eth_rx_write_byte)
     );
 
 endmodule

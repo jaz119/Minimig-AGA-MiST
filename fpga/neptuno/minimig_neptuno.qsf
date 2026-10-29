@@ -364,13 +364,11 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name VERILOG_MACRO "MINIMIG_AUX_AUDIO=1"
 set_global_assignment -name VERILOG_MACRO "MINIMIG_TOCCATA=1"
 set_global_assignment -name VERILOG_MACRO "MINIMIG_CONTROL_BOARD=1"
-set_global_assignment -name VERILOG_MACRO "MINIMIG_XSURF=1"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_volume.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_playback.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_fifo.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_capture.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata.sv"
-set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/xsurf.v
 set_global_assignment -name VERILOG_FILE ../../rtl/rtg/rtg_video.v
 set_global_assignment -name QIP_FILE ../../EightThirtyTwo/RTL/altera/debug_fifo_altera.qip
 set_global_assignment -name SDC_FILE minimig_neptuno.sdc

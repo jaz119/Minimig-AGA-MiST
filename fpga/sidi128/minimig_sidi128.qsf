@@ -493,6 +493,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_f
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_capture.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata.sv"
 set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/xsurf.v
+set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/rtl8019.v
 set_global_assignment -name SIGNALTAP_FILE output_files/tg68k.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/spi.stp
 set_global_assignment -name SIGNALTAP_FILE hdmi.stp
