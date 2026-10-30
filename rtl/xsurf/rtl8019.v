@@ -145,8 +145,8 @@ always @(posedge clk) begin
 	end
 end
 
-reg  [7:0] reg_do;
-reg [15:0] rom_do;
+reg [7:0] reg_do;
+reg [7:0] rom_do;
 
 reg [15:0] rx_buffer_do;
 reg [15:0] tx_buffer_do;
@@ -154,26 +154,22 @@ reg [15:0] tx_buffer_do;
 // PROM read (16-bit)
 always @(*) begin
 	case (rsar[3:1])
-		3'h0: rom_do = { mac[0], mac[0] };
-		3'h1: rom_do = { mac[1], mac[1] };
-		3'h2: rom_do = { mac[2], mac[2] };
-		3'h3: rom_do = { mac[3], mac[3] };
-		3'h4: rom_do = { mac[4], mac[4] };
-		3'h5: rom_do = { mac[5], mac[5] };
-		3'h7: rom_do = 16'h5757;
-		default: rom_do = 16'd0;
+		3'h0: rom_do = mac[0];
+		3'h1: rom_do = mac[1];
+		3'h2: rom_do = mac[2];
+		3'h3: rom_do = mac[3];
+		3'h4: rom_do = mac[4];
+		3'h5: rom_do = mac[5];
+		3'h7: rom_do = 8'h57;
+		default: rom_do = 8'd0;
 	endcase
 end
 
 // register read
 always @(*) begin
-	reg_do = 8'h00;
-	// cr is available on all pages
-	if (addr == 0) begin
-		reg_do = cr;
-	end
+	reg_do = 8'd0;
 	// page 0
-	else if (ps == 0) begin
+	if (ps == 0) begin
 		case (addr)
 			5'h03: reg_do = bnry;
 			5'h04: reg_do = tsr;
@@ -187,24 +183,36 @@ always @(*) begin
 		endcase
 	end
 	// page 1
-	else if (ps == 1) begin
+	if (ps == 1) begin
 		if (addr == 7) reg_do = curr;
+	end
+	// page 3
+	if (ps == 3) begin
+		case (addr)
+			5'h03: reg_do = 8'h08; // jumper mode
+			5'h04: reg_do = 8'h90; // irq 3, port 0x300
+			5'h06: reg_do = 8'h40; // full duplex
+			default: ;
+		endcase
+	end
+	// cr is available on all pages
+	if (addr == 0) begin
+		reg_do = cr;
 	end
 end
 
 wire is_loop = (lb != 2'b00);
 wire is_prom = (rsar[15:8] == 8'h00);
 
-wire [15:0] dma_do = (is_prom) ? rom_do
+wire [15:0] dma_do = (is_prom) ? { rom_do, rom_do }
 	: (is_loop) ? tx_buffer_do
 	: rx_buffer_do;
 
 // CPU read
 always @(*) begin
+	dout = 16'd0;
 	if (rd) begin
 		dout = dma_port ? dma_do : { reg_do, reg_do };
-	end else begin
-		dout = 16'd0;
 	end
 end
 

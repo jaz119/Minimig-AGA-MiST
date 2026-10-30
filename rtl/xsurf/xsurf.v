@@ -27,7 +27,7 @@ module xsurf
     input       [7:0] eth_rx_write_byte
 );
 
-    localparam ETH_BASE = 16'h8600;
+    localparam ETH_BASE = 16'h8600; // port 0x300
     wire sel_eth = sel && (addr[15:6] == ETH_BASE[15:6]);
 
     wire rd = sel_eth && cpu_rd;
@@ -41,7 +41,8 @@ module xsurf
             if (sel_eth) begin
                 // ethernet data
                 dout = eth_dout;
-            end else if (sel && (addr[15:1] == 15'h0020)) begin
+            end
+            if (sel && (addr[15:1] == 15'h0020)) begin
                 // reg 0x40: status of ethernet irq
                 dout = { int2, 1'b0, int2, 13'd0 };
             end
