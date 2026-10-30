@@ -1,8 +1,9 @@
 // Minimig autoconfig logic
 
 module minimig_autoconfig #(
-	parameter TOCCATA_SND = 1'b0,  // Toccata sound card enabled?
-	parameter CONTROL_BOARD = 1'b0 // Control board enabled?
+	parameter TOCCATA_SND   = 1'b0, // Toccata sound card enabled?
+	parameter CONTROL_BOARD = 1'b0, // Control board enabled?
+	parameter XSURF_ETH     = 1'b0  // X-Surf ethernet card enabled?
 ) (
 	input clk,
 	input clk7_en,
@@ -79,8 +80,9 @@ begin
 		roma_wr[8:0] <= 9'h001;	// Write address for modifying size of ZII RAM.
 		rom_we <= 1'b1;
 
-		// Select first device for the reset process (if RAM is disabled)
-		acdevice <= |fastram_config ? 3'b000 : (TOCCATA_SND ? 3'b101 : 3'b100);
+		// Select first device for the reset process
+		acdevice <= |fastram_config ? 3'b000 : (TOCCATA_SND ? 3'b101
+			: (XSURF_ETH ? 3'b100 : (CONTROL_BOARD ? 3'b110 : 3'b111)));
 		init <= 1'b0;
 	end
 	else
@@ -101,17 +103,18 @@ begin
 								rom_we <= 1'b1;
 
 								board_configured[0] <= 1'b1;
-								acdevice <= (&fastram_config & m68020) ? 3'b001 : (TOCCATA_SND ? 3'b101 : 3'b100); // ZIII RAM or X-Surf next
+								acdevice <= (&fastram_config & m68020) ? 3'b001 : (TOCCATA_SND ? 3'b101
+									: (XSURF_ETH ? 3'b100 : (CONTROL_BOARD ? 3'b110 : 3'b111)));
 							end
 						3'b100: begin // X-Surf ethernet card
 								board_configured[6] <= 1'b1;
 								xsurf_base_addr <= data_in[7:0];
-								acdevice <= CONTROL_BOARD ? 3'b110 : 3'b111; // Either control board or NULL device to terminate the chain
+								acdevice <= CONTROL_BOARD ? 3'b110 : 3'b111;
 							end
 						3'b101: begin // Toccata sound card
 								board_configured[4] <= 1'b1;
 								toccata_base_addr <= data_in[7:0]; // Store Toccata base address
-								acdevice <= 3'b100;
+								acdevice <= XSURF_ETH ? 3'b100 : (CONTROL_BOARD ? 3'b110 : 3'b111);
 							end
 						3'b110: begin // Minimig Control board
 								board_configured[5] <= 1'b1;
@@ -144,11 +147,8 @@ begin
 							end
 						3'b011 : begin // ZIII RAM 3 - Use leftover space in the memory map.
 								board_configured[3] <= 1'b1;
-								if (TOCCATA_SND) begin
-									acdevice <= 3'b101; // Toccata sound card
-								end else begin
-									acdevice <= 3'b100; // X-Surf ethernet card
-								end
+								acdevice <= TOCCATA_SND ? 3'b101 : (XSURF_ETH ? 3'b100
+									: (CONTROL_BOARD ? 3'b110 : 3'b111));
 							end
 						default:
 							;
@@ -161,7 +161,7 @@ begin
 								board_shutup[6] <= 1'b1;
 							end
 						3'b101: begin // Shut up Toccata Sound card
-								acdevice <= 3'b100;
+								acdevice <= XSURF_ETH ? 3'b100 : (CONTROL_BOARD ? 3'b110 : 3'b111);
 								board_shutup[4] <= 1'b1;
 							end
 						3'b110: begin // Shut up Control board

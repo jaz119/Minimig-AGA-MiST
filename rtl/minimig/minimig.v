@@ -1251,9 +1251,16 @@ localparam MMCB = 1'b1;
 localparam MMCB = 1'b0;
 `endif
 
+`ifdef MINIMIG_XSURF
+localparam MMXSURF = 1'b1;
+`else
+localparam MMXSURF = 1'b0;
+`endif
+
 minimig_autoconfig #(
 	.TOCCATA_SND(MMTOC),
-	.CONTROL_BOARD(MMCB)
+	.CONTROL_BOARD(MMCB),
+	.XSURF_ETH(MMXSURF)
 ) autoconfig (
 	.clk(clk),
 	.clk7_en(clk7_en),

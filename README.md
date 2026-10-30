@@ -29,6 +29,7 @@ PS/2 mice, Turbo Chameleon Docking Station for extra joysticks or real Amiga mou
 * supports basic [retargetable graphics](https://en.wikipedia.org/wiki/Retargetable_graphics) with a P96 driver
 * has an implementation of the [Akiko](https://en.wikipedia.org/wiki/Amiga_custom_chips#Akiko) chunky to planar converter
 * has an extra audio channel which can be used from the Amiga to play CD-quality WAV files, or used on some platforms to emulate floppy drive sounds.
+* Ethernet via *Individual Computers X-Surf* (over SPI)
 
 
 ## Usage
