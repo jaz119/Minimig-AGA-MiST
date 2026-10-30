@@ -154,9 +154,12 @@ reg [15:0] tx_buffer_do;
 // PROM read (16-bit)
 always @(*) begin
 	case (rsar[3:1])
-		3'h0: rom_do = { mac[1], mac[0] };
-		3'h1: rom_do = { mac[3], mac[2] };
-		3'h2: rom_do = { mac[5], mac[4] };
+		3'h0: rom_do = { mac[0], mac[0] };
+		3'h1: rom_do = { mac[1], mac[1] };
+		3'h2: rom_do = { mac[2], mac[2] };
+		3'h3: rom_do = { mac[3], mac[3] };
+		3'h4: rom_do = { mac[4], mac[4] };
+		3'h5: rom_do = { mac[5], mac[5] };
 		3'h7: rom_do = 16'h5757;
 		default: rom_do = 16'd0;
 	endcase
