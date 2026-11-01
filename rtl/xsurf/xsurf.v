@@ -37,14 +37,13 @@ module xsurf
 
     always @(*) begin
         dout = 16'd0;
-        if (cpu_rd) begin
-            if (sel_eth) begin
+        if (sel && cpu_rd) begin
+            if ((addr[7:1] == 7'h20) && !addr[11] && !addr[15]) begin
+                // reg 0x40: status of ethernet irq
+                dout = { {int2, 1'b0, int2, 5'b0}, {int2, 1'b0, int2, 5'b0} };
+            end else if (sel_eth) begin
                 // ethernet data
                 dout = eth_dout;
-            end
-            if (sel && (addr[15:1] == 15'h0020)) begin
-                // reg 0x40: status of ethernet irq
-                dout = { int2, 1'b0, int2, 13'd0 };
             end
         end
     end

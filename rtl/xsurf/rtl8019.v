@@ -40,6 +40,7 @@ reg [7:0]  rcr;            // receiver control register
 reg [7:0]  rsr;            // receiver status register
 reg [7:0]  tcr;            // transmitter control register
 reg [7:0]  tsr;            // transmitter status register
+reg [7:0]  dcr;            // data configuration register
 reg [7:0]  curr;           // current page register
 reg [7:0]  bnry;           // boundary page
 reg [7:0]  clda;           // current local dma page register
@@ -55,6 +56,7 @@ wire txp  = cr[2];         // transmit packet toggle
 wire [1:0] ps = cr[7:6];   // register page select
 wire [1:0] lb = tcr[2:1];  // loopback mode select
 wire mon = rcr[5];         // monitor mode
+wire ls = dcr[3];          // loopback select
 
 wire dma_port = (addr[4:3] == 2'b10); // remote DMA ports ($10 - $17)
 wire rst_port = (addr[4:3] == 2'b11); // reset ports ($18 - $1F)
@@ -95,6 +97,9 @@ always @(posedge clk) begin
 	if (rst) begin
 		tx_begin_sr  <= 2'd0;
 		tx_strobe_sr <= 2'd0;
+	end else if (txp && ~ls) begin
+		tx_begin_sr[0] <= 1'b0;
+		tx_begin_sr[1] <= 1'b1;
 	end else begin
 		tx_begin_sr  <= { tx_begin_sr[0],  tx_begin  };
 		tx_strobe_sr <= { tx_strobe_sr[0], tx_strobe };
@@ -191,7 +196,6 @@ always @(*) begin
 		case (addr)
 			5'h03: reg_do = 8'h08; // jumper mode
 			5'h04: reg_do = 8'h90; // irq 3, port 0x300
-			5'h06: reg_do = 8'h40; // full duplex
 			default: ;
 		endcase
 	end
@@ -201,8 +205,8 @@ always @(*) begin
 	end
 end
 
-wire is_loop = (lb != 2'b00);
-wire is_prom = (rsar[15:8] == 8'h00);
+wire is_loop = (lb != 0);
+wire is_prom = (rsar[15:8] == 0);
 
 wire [15:0] dma_do = (is_prom) ? { rom_do, rom_do }
 	: (is_loop) ? tx_buffer_do
@@ -281,6 +285,10 @@ always @(posedge clk) begin
 				end
 				rx_fin <= 1'b0;
 			end
+		end else if (txp && ~ls) begin
+			rsr <= 8'h01; // PRX
+			rx_fin_d <= 1'b1;
+			rx_fin <= 1'b0;
 		end
 	end
 end
@@ -297,16 +305,14 @@ always @(posedge clk) begin
 	if (rst) begin
 		tsr <= 8'h00;
 	end else begin
-		if (wrong_tx) begin
-			// avoid sending invalid frames
-			tsr <= 8'h20; // FU
-		end else if (tx_start) begin
-			tsr <= 8'h00;
+		if (tx_start) begin
 			tx_addr <= { tpsr, 8'd0 };
 		end else if (tx_strobe_pe) begin
 			tx_addr <= tx_addr + 12'd1;
 		end else if (tx_done) begin
-			tsr[0] <= 1'b1; // PTX
+			tsr <= 8'h01; // PTX
+		end else if (wrong_tx) begin
+			tsr <= 8'h20; // FU
 		end
 	end
 end
@@ -330,8 +336,8 @@ always @(posedge clk) begin
 	end
 end
 
-wire rbcr_is_0 = (rbcr == 15'd0);
-wire rbcr_is_1 = (rbcr == 15'd1);
+wire rbcr_is_0 = (rbcr == 0);
+wire rbcr_is_1 = (rbcr == 1);
 
 // CPU write
 always @(posedge clk) begin
@@ -339,6 +345,7 @@ always @(posedge clk) begin
 		cr   <= 8'h21;    // ABORT, STP
 		rcr  <= 8'h20;    // MON
 		tcr  <= 8'h02;    // LB1
+		dcr  <= 8'h00;
 		isr  <= 8'h80;    // RST
 		imr  <= 8'h00;
 		rbcr <= 15'h3828; // RTL8019 Id (0x7050)
@@ -378,6 +385,7 @@ always @(posedge clk) begin
 						5'h0b: rbcr[15:8] <= din[7:0];
 						5'h0c: rcr <= din[7:0];
 						5'h0d: tcr <= din[7:0];
+						5'h0e: dcr <= din[7:0];
 						5'h0f: imr <= din[7:0];
 						default: ;
 					endcase
