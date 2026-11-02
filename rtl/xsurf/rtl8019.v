@@ -189,7 +189,16 @@ always @(*) begin
 	end
 	// page 1
 	if (ps == 1) begin
-		if (addr == 7) reg_do = curr;
+		case (addr)
+			5'h01: reg_do = mac[0];
+			5'h02: reg_do = mac[1];
+			5'h03: reg_do = mac[2];
+			5'h04: reg_do = mac[3];
+			5'h05: reg_do = mac[4];
+			5'h06: reg_do = mac[5];
+			5'h07: reg_do = curr;
+			default: ;
+		endcase
 	end
 	// page 3
 	if (ps == 3) begin
