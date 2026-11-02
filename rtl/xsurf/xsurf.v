@@ -57,8 +57,8 @@ module xsurf
         .wr(wr),
 
         .addr(addr[5:1]),
-        .din(din),
-        .dout(eth_dout),
+        .din({ din[7:0], din[15:8] }),
+        .dout({ eth_dout[7:0], eth_dout[15:8] }),
 
         .irq(int2),
         .status(eth_status),
