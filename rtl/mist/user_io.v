@@ -32,17 +32,17 @@ module user_io
 	// ethernet interface
 	input [31:0]  eth_status,
 
-	output reg          eth_mac_begin,
+	output reg          eth_mac_wr,
 	output reg          eth_mac_strobe,
 	output reg    [7:0] eth_mac_byte,
 
-	output reg          eth_tx_read_begin,
-	output reg          eth_tx_read_strobe,
-	input         [7:0] eth_tx_read_byte,
+	output reg          eth_tx_rd,
+	output reg          eth_tx_strobe,
+	input         [7:0] eth_tx_byte,
 
-	output reg          eth_rx_write_begin,
-	output reg          eth_rx_write_strobe,
-	output reg    [7:0] eth_rx_write_byte,
+	output reg          eth_rx_wr,
+	output reg          eth_rx_strobe,
+	output reg    [7:0] eth_rx_byte,
 
 	// i2c bridge
 	output reg          i2c_start,
@@ -148,7 +148,7 @@ always @(posedge spi_sck or posedge SPI_SS_IO) begin : spi_transmitter
 
 			// read ethernet tx buffer
 			8'h0b: begin
-				spi_byte_out <= eth_tx_read_byte;
+				spi_byte_out <= eth_tx_byte;
 			end
 
 			// i2c bridge
@@ -204,14 +204,14 @@ always @(posedge clk_sys) begin
 
 	// strobe is set whenever a valid byte has been received
 	kbd_mouse_strobe <= 0;
-
-	i2c_start <= 0;
-	eth_mac_begin <= 1'b0;
 	eth_mac_strobe <= 1'b0;
-	eth_tx_read_begin <= 1'b0;
-	eth_tx_read_strobe <= 1'b0;
-	eth_rx_write_begin <= 1'b0;
-	eth_rx_write_strobe <= 1'b0;
+	eth_tx_strobe <= 1'b0;
+	eth_rx_strobe <= 1'b0;
+	i2c_start <= 0;
+
+	eth_mac_wr <= 1'b0;
+	eth_tx_rd <= 1'b0;
+	eth_rx_wr <= 1'b0;
 
 	if (spi_transfer_end) begin
 		acmd <= 8'd0;
@@ -231,9 +231,9 @@ always @(posedge clk_sys) begin
 				end
 				8'h05: kbd_mouse_type <= 2'b10;  // keyboard
 		 		8'h06: kbd_mouse_type <= 2'b11;  // OSD keyboard
-		 		8'h09: eth_mac_begin  <= 1'b1;
-		 		8'h0b: eth_tx_read_begin  <= 1'b1;
-		 		8'h0c: eth_rx_write_begin <= 1'b1;
+		 		8'h09: eth_mac_wr <= 1'b1;
+		 		8'h0b: eth_tx_rd <= 1'b1;
+		 		8'h0c: eth_rx_wr <= 1'b1;
 			endcase
 		end else begin
 
@@ -287,13 +287,13 @@ always @(posedge clk_sys) begin
 
 				// send byte to ethernet controller
 				8'h0b: begin
-					eth_tx_read_strobe <= 1'b1;
+					eth_tx_strobe <= 1'b1;
 				end
 
 				// send received byte to ethernet controller
 				8'h0c: begin
-					eth_rx_write_byte <= spi_byte_in;
-					eth_rx_write_strobe <= 1'b1;
+					eth_rx_byte <= spi_byte_in;
+					eth_rx_strobe <= 1'b1;
 				end
 
 				// joystick analog

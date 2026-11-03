@@ -283,12 +283,12 @@ wire           midi_out;
 
 // ethernet
 wire    [31:0] eth_status;
-wire           eth_mac_strobe, eth_mac_begin;
+wire           eth_mac_strobe, eth_mac_wr;
 wire     [7:0] eth_mac_byte;
-wire           eth_tx_read_strobe, eth_tx_read_begin;
-wire     [7:0] eth_tx_read_byte;
-wire           eth_rx_write_strobe, eth_rx_write_begin;
-wire     [7:0] eth_rx_write_byte;
+wire           eth_tx_strobe, eth_tx_rd;
+wire     [7:0] eth_tx_byte;
+wire           eth_rx_strobe, eth_rx_wr;
+wire     [7:0] eth_rx_byte;
 
 `ifdef MINIMIG_USE_HDMI
 wire        i2c_start;
@@ -733,15 +733,15 @@ user_io user_io(
      .CORE_TYPE(8'ha5),    // minimig core id (a1 - old minimig id, a5 - new aga minimig id)
      .CONF(core_config),
      .eth_status(eth_status),
-     .eth_mac_begin(eth_mac_begin),
+     .eth_mac_wr(eth_mac_wr),
      .eth_mac_strobe(eth_mac_strobe),
      .eth_mac_byte(eth_mac_byte),
-     .eth_tx_read_begin(eth_tx_read_begin),
-     .eth_tx_read_strobe(eth_tx_read_strobe),
-     .eth_tx_read_byte(eth_tx_read_byte),
-     .eth_rx_write_begin(eth_rx_write_begin),
-     .eth_rx_write_strobe(eth_rx_write_strobe),
-     .eth_rx_write_byte(eth_rx_write_byte),
+     .eth_tx_rd(eth_tx_rd),
+     .eth_tx_strobe(eth_tx_strobe),
+     .eth_tx_byte(eth_tx_byte),
+     .eth_rx_wr(eth_rx_wr),
+     .eth_rx_strobe(eth_rx_strobe),
+     .eth_rx_byte(eth_rx_byte),
 `ifdef MINIMIG_USE_HDMI
      .i2c_start      (i2c_start      ),
      .i2c_read       (i2c_read       ),
@@ -903,16 +903,16 @@ minimig minimig (
   .aux_left_2   (ds_aud           ),  // Auxiliary audio
   .aux_right_2  (ds_aud           ),  // Auxiliary audio
   // ethernet
-  .eth_status          (eth_status         ),
-  .eth_mac_begin       (eth_mac_begin      ),
-  .eth_mac_strobe      (eth_mac_strobe     ),
-  .eth_mac_byte        (eth_mac_byte       ),
-  .eth_tx_read_begin   (eth_tx_read_begin  ),
-  .eth_tx_read_strobe  (eth_tx_read_strobe ),
-  .eth_tx_read_byte    (eth_tx_read_byte   ),
-  .eth_rx_write_begin  (eth_rx_write_begin ),
-  .eth_rx_write_strobe (eth_rx_write_strobe),
-  .eth_rx_write_byte   (eth_rx_write_byte  ),
+  .eth_status     (eth_status     ),
+  .eth_mac_wr     (eth_mac_wr     ),
+  .eth_mac_strobe (eth_mac_strobe ),
+  .eth_mac_byte   (eth_mac_byte   ),
+  .eth_tx_rd      (eth_tx_rd      ),
+  .eth_tx_strobe  (eth_tx_strobe  ),
+  .eth_tx_byte    (eth_tx_byte    ),
+  .eth_rx_wr      (eth_rx_wr      ),
+  .eth_rx_strobe  (eth_rx_strobe  ),
+  .eth_rx_byte    (eth_rx_byte    ),
   //user i/o
   .cpu_config   (cpu_config       ), // CPU config
   .board_configured(board_configured),

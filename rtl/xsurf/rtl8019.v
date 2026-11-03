@@ -16,15 +16,15 @@ module rtl8019
 
 	output     [31:0] status,
 
-	input             tx_begin,
+	input             tx_rd,
 	input             tx_strobe,
 	output reg  [7:0] tx_byte,
 
-	input             rx_begin,
+	input             rx_wr,
 	input             rx_strobe,
 	input       [7:0] rx_byte,
 
-	input             mac_begin,
+	input             mac_wr,
 	input             mac_strobe,
 	input       [7:0] mac_byte
 );
@@ -74,33 +74,33 @@ end
 wire rd_ne = ~rd & rd_d;
 wire wr_ne = ~wr & wr_d;
 
-reg rx_begin_d;
-reg mac_begin_d;
+reg rx_wr_d;
+reg mac_wr_d;
 
 always @(posedge clk) begin
-	rx_begin_d <= rx_begin;
-	mac_begin_d <= mac_begin;
+	rx_wr_d  <= rx_wr;
+	mac_wr_d <= mac_wr;
 end
 
-wire rx_start =  rx_begin  & ~rx_begin_d;
-wire rx_stop  = ~rx_begin  &  rx_begin_d;
-wire mac_start = mac_begin & ~mac_begin_d;
+wire rx_start =  rx_wr  & ~rx_wr_d;
+wire rx_stop  = ~rx_wr  &  rx_wr_d;
+wire mac_start = mac_wr & ~mac_wr_d;
 
-reg [1:0] tx_begin_sr;
+reg [1:0] tx_rd_sr;
 reg [1:0] tx_strobe_sr;
 
 always @(posedge clk) begin
 	if (rst) begin
-		tx_begin_sr  <= 2'd0;
+		tx_rd_sr <= 2'd0;
 		tx_strobe_sr <= 2'd0;
 	end else begin
-		tx_begin_sr  <= { tx_begin_sr[0],  tx_begin  };
+		tx_rd_sr <= { tx_rd_sr[0],  tx_rd };
 		tx_strobe_sr <= { tx_strobe_sr[0], tx_strobe };
 	end
 end
 
-wire tx_start = tx_begin_sr[0] & ~tx_begin_sr[1];
-wire tx_done = ~tx_begin_sr[0] &  tx_begin_sr[1];
+wire tx_start = tx_rd_sr[0] & ~tx_rd_sr[1];
+wire tx_done = ~tx_rd_sr[0] &  tx_rd_sr[1];
 wire tx_strobe_pe = tx_strobe_sr[0] & ~tx_strobe_sr[1];
 
 // reset

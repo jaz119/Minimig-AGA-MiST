@@ -16,15 +16,15 @@ module xsurf
     output reg [15:0] dout,
     output            int2,                 // interrupt request
     output     [31:0] eth_status,           // ethernet nic status
-    input             eth_mac_begin,
+    input             eth_mac_wr,
     input             eth_mac_strobe,
     input       [7:0] eth_mac_byte,
-    input             eth_tx_read_begin,
-    input             eth_tx_read_strobe,
-    output      [7:0] eth_tx_read_byte,
-    input             eth_rx_write_begin,
-    input             eth_rx_write_strobe,
-    input       [7:0] eth_rx_write_byte
+    input             eth_tx_rd,
+    input             eth_tx_strobe,
+    output      [7:0] eth_tx_byte,
+    input             eth_rx_wr,
+    input             eth_rx_strobe,
+    input       [7:0] eth_rx_byte
 );
 
     localparam ETH_BASE = 16'h8600; // port 0x300
@@ -63,17 +63,17 @@ module xsurf
         .irq(int2),
         .status(eth_status),
 
-        .mac_begin(eth_mac_begin),
+        .mac_wr(eth_mac_wr),
         .mac_strobe(eth_mac_strobe),
         .mac_byte(eth_mac_byte),
 
-        .tx_begin(eth_tx_read_begin),
-        .tx_strobe(eth_tx_read_strobe),
-        .tx_byte(eth_tx_read_byte),
+        .tx_rd(eth_tx_rd),
+        .tx_strobe(eth_tx_strobe),
+        .tx_byte(eth_tx_byte),
 
-        .rx_begin(eth_rx_write_begin),
-        .rx_strobe(eth_rx_write_strobe),
-        .rx_byte(eth_rx_write_byte)
+        .rx_wr(eth_rx_wr),
+        .rx_strobe(eth_rx_strobe),
+        .rx_byte(eth_rx_byte)
     );
 
 endmodule

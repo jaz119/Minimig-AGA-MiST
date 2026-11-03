@@ -249,15 +249,15 @@ module minimig
     input   [15:0]aux_right_2,		// Auxiliary audio channels
 	// ethernet (via spi bus)
 	output [31:0] eth_status,
-	input  eth_mac_begin,
+	input  eth_mac_wr,
 	input  eth_mac_strobe,
 	input  [7:0] eth_mac_byte,
-	input  eth_tx_read_begin,
-	input  eth_tx_read_strobe,
-	output [7:0] eth_tx_read_byte,
-	input  eth_rx_write_begin,
-	input  eth_rx_write_strobe,
-	input  [7:0] eth_rx_write_byte,
+	input  eth_tx_rd,
+	input  eth_tx_strobe,
+	output [7:0] eth_tx_byte,
+	input  eth_rx_wr,
+	input  eth_rx_strobe,
+	input  [7:0] eth_rx_byte,
 	//user i/o
   output  [3:0] cpu_config,
   output  [6:0] board_configured,
@@ -1379,22 +1379,22 @@ xsurf xsurf_eth
   .dout(xsurf_data_out),
   .int2(int2_xsurf),
   .eth_status(eth_status),
-  .eth_mac_begin(eth_mac_begin),
+  .eth_mac_wr(eth_mac_wr),
   .eth_mac_strobe(eth_mac_strobe),
   .eth_mac_byte(eth_mac_byte),
-  .eth_tx_read_begin(eth_tx_read_begin),
-  .eth_tx_read_strobe(eth_tx_read_strobe),
-  .eth_tx_read_byte(eth_tx_read_byte),
-  .eth_rx_write_begin(eth_rx_write_begin),
-  .eth_rx_write_strobe(eth_rx_write_strobe),
-  .eth_rx_write_byte(eth_rx_write_byte)
+  .eth_tx_rd(eth_tx_rd),
+  .eth_tx_strobe(eth_tx_strobe),
+  .eth_tx_byte(eth_tx_byte),
+  .eth_rx_wr(eth_rx_wr),
+  .eth_rx_strobe(eth_rx_strobe),
+  .eth_rx_byte(eth_rx_byte)
 );
 
 `else
 
   assign int2_xsurf = 1'b0;
   assign xsurf_data_out = 16'd0;
-  assign eth_tx_read_byte = 8'd0;
+  assign eth_tx_byte = 8'd0;
   assign eth_status = 32'd0;
 
 `endif
