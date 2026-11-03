@@ -190,16 +190,17 @@ reg       spi_receiver_strobe;
 reg       spi_transfer_end;
 reg       spi_receiver_strobeD;
 reg       spi_transfer_endD;
+
 reg [7:0] acmd;
-reg [7:0] abyte_cnt; // counts bytes
+reg [3:0] abyte_cnt; // counts bytes
 
 // Process bytes from SPI at the clk_sys domain
 always @(posedge clk_sys) begin
 	//synchronize between SPI and sys clock domains
 	spi_receiver_strobeD <= spi_receiver_strobe_r;
 	spi_receiver_strobe <= spi_receiver_strobeD;
-	spi_transfer_endD	<= spi_transfer_end_r;
-	spi_transfer_end	<= spi_transfer_endD;
+	spi_transfer_endD <= spi_transfer_end_r;
+	spi_transfer_end  <= spi_transfer_endD;
 
 	// strobe is set whenever a valid byte has been received
 	kbd_mouse_strobe <= 0;
@@ -213,12 +214,15 @@ always @(posedge clk_sys) begin
 	eth_rx_write_strobe <= 1'b0;
 
 	if (spi_transfer_end) begin
+		acmd <= 8'd0;
 		abyte_cnt <= 8'd0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
+		if (~&abyte_cnt)
+			abyte_cnt <= abyte_cnt + 8'd1;
+
 		if (abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
-			abyte_cnt <= 8'd1;
 
 			case (spi_byte_in)
 				8'h70, 8'h71: begin
@@ -327,9 +331,6 @@ always @(posedge clk_sys) begin
 					end
 				end
 			endcase
-
-			if (~&abyte_cnt)
-				abyte_cnt <= abyte_cnt + 8'd1;
 		end
 	end
 end

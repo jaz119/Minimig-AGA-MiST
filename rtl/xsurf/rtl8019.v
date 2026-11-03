@@ -40,7 +40,6 @@ reg [7:0]  rcr;            // receiver control register
 reg [7:0]  rsr;            // receiver status register
 reg [7:0]  tcr;            // transmitter control register
 reg [7:0]  tsr;            // transmitter status register
-reg [7:0]  dcr;            // data configuration register
 reg [7:0]  curr;           // current page register
 reg [7:0]  bnry;           // boundary page
 reg [7:0]  clda;           // current local dma page register
@@ -56,7 +55,6 @@ wire txp  = cr[2];         // transmit packet toggle
 wire [1:0] ps = cr[7:6];   // register page select
 wire [1:0] lb = tcr[2:1];  // loopback mode select
 wire mon = rcr[5];         // monitor mode
-wire ls = dcr[3];          // loopback select
 
 wire dma_port = (addr[4:3] == 2'b10); // remote DMA ports ($10 - $17)
 wire rst_port = (addr[4:3] == 2'b11); // reset ports ($18 - $1F)
@@ -79,27 +77,22 @@ wire wr_ne = ~wr & wr_d;
 reg rx_begin_d;
 reg mac_begin_d;
 
-// same clock domain
 always @(posedge clk) begin
 	rx_begin_d <= rx_begin;
 	mac_begin_d <= mac_begin;
 end
 
-wire rx_start = rx_begin & ~rx_begin_d;
-wire rx_stop = ~rx_begin &  rx_begin_d;
+wire rx_start =  rx_begin  & ~rx_begin_d;
+wire rx_stop  = ~rx_begin  &  rx_begin_d;
 wire mac_start = mac_begin & ~mac_begin_d;
 
 reg [1:0] tx_begin_sr;
 reg [1:0] tx_strobe_sr;
 
-// belongs to SPI clock domain
 always @(posedge clk) begin
 	if (rst) begin
 		tx_begin_sr  <= 2'd0;
 		tx_strobe_sr <= 2'd0;
-	end else if (txp && ~ls) begin
-		tx_begin_sr[0] <= 1'b0;
-		tx_begin_sr[1] <= 1'b1;
 	end else begin
 		tx_begin_sr  <= { tx_begin_sr[0],  tx_begin  };
 		tx_strobe_sr <= { tx_strobe_sr[0], tx_strobe };
@@ -156,7 +149,7 @@ reg [7:0] rom_do;
 reg [15:0] rx_buffer_do;
 reg [15:0] tx_buffer_do;
 
-// PROM read (16-bit)
+// prom read
 always @(*) begin
 	case (rsar[3:1])
 		3'h0: rom_do = mac[0];
@@ -294,10 +287,6 @@ always @(posedge clk) begin
 				end
 				rx_fin <= 1'b0;
 			end
-		end else if (txp && ~ls) begin
-			rsr <= 8'h01; // PRX
-			rx_fin_d <= 1'b1;
-			rx_fin <= 1'b0;
 		end
 	end
 end
@@ -305,8 +294,6 @@ end
 reg  [11:0] tx_addr;
 wire [11:1] tx_r_addr = (is_loop) ? rsar[11:1] : tx_addr[11:1];
 wire tx_byte_sel = tx_addr[0];
-
-wire wrong_tx = (tbcr == 0 || tbcr > 1514) && txp;
 
 // local DMA frame transmitter
 always @(posedge clk) begin
@@ -320,20 +307,14 @@ always @(posedge clk) begin
 			tx_addr <= tx_addr + 12'd1;
 		end else if (tx_done) begin
 			tsr <= 8'h01; // PTX
-		end else if (wrong_tx) begin
-			tsr <= 8'h20; // FU
 		end
 	end
 end
 
 // remote DMA data reader
 always @(posedge clk) begin
-	rx_buffer_do <= rx_buffer[rsar[11:1]];
-end
-
-// remote DMA data reader
-always @(posedge clk) begin
 	tx_buffer_do <= tx_buffer[tx_r_addr];
+	rx_buffer_do <= rx_buffer[rsar[11:1]];
 end
 
 // remote DMA data writer
@@ -354,7 +335,6 @@ always @(posedge clk) begin
 		cr   <= 8'h21;    // ABORT, STP
 		rcr  <= 8'h20;    // MON
 		tcr  <= 8'h02;    // LB1
-		dcr  <= 8'h00;
 		isr  <= 8'h80;    // RST
 		imr  <= 8'h00;
 		rbcr <= 15'h3828; // RTL8019 Id (0x7050)
@@ -394,7 +374,6 @@ always @(posedge clk) begin
 						5'h0b: rbcr[15:8] <= din[7:0];
 						5'h0c: rcr <= din[7:0];
 						5'h0d: tcr <= din[7:0];
-						5'h0e: dcr <= din[7:0];
 						5'h0f: imr <= din[7:0];
 						default: ;
 					endcase
@@ -423,11 +402,7 @@ always @(posedge clk) begin
 		if (tx_done) begin
 			isr[1] <= 1'b1; // PTX
 			cr[2] <= 1'b0;  // TXP
-		end
-		// transmitting wrong-length frame
-		if (wrong_tx) begin
-			isr[3] <= 1'b1; // TXE
-			cr[2] <= 1'b0;  // TXP
+			tbcr <= 11'd0;
 		end
 	end
 end
