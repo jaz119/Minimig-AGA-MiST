@@ -116,10 +116,14 @@ end
 reg [7:0] spi_byte_out;
 
 always @(negedge spi_sck or posedge SPI_SS_IO) begin : spi_byteout
-	if(SPI_SS_IO == 1) begin
+	if (SPI_SS_IO == 1) begin
 		SPI_MISO <= 1'bZ;
 	end else begin
-		SPI_MISO <= spi_byte_out[~bit_cnt];
+		if (cmd == 8'h0b && byte_cnt != 0) begin
+			SPI_MISO <= eth_tx_byte[~bit_cnt];
+		end else begin
+			SPI_MISO <= spi_byte_out[~bit_cnt];
+		end
 	end
 end
 
@@ -144,11 +148,6 @@ always @(posedge spi_sck or posedge SPI_SS_IO) begin : spi_transmitter
 					2'd2: spi_byte_out <= eth_status[15:8];
 					2'd3: spi_byte_out <= eth_status[7:0];
 				endcase
-			end
-
-			// read ethernet tx buffer
-			8'h0b: begin
-				spi_byte_out <= eth_tx_byte;
 			end
 
 			// i2c bridge

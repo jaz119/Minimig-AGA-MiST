@@ -63,7 +63,7 @@ wire rst_port = (addr[4:3] == 2'b11); // reset ports ($18 - $1F)
 reg [15:0] rx_buffer[2047:0]; // 2-4 ethernet frames
 reg [15:0] tx_buffer[2047:0]; // 2 ethernet frames (ping-pong)
 
-// control signals
+// cpu signals
 reg rd_d, wr_d;
 
 always @(posedge clk) begin
@@ -74,34 +74,20 @@ end
 wire rd_ne = ~rd & rd_d;
 wire wr_ne = ~wr & wr_d;
 
-reg rx_wr_d;
-reg mac_wr_d;
+// spi bus signals
+reg tx_rd_d, rx_wr_d, mac_wr_d;
 
 always @(posedge clk) begin
-	rx_wr_d  <= rx_wr;
+	tx_rd_d <= tx_rd;
+	rx_wr_d <= rx_wr;
 	mac_wr_d <= mac_wr;
 end
 
+wire tx_start =  tx_rd  & ~tx_rd_d;
+wire tx_done  = ~tx_rd  &  tx_rd_d;
 wire rx_start =  rx_wr  & ~rx_wr_d;
 wire rx_stop  = ~rx_wr  &  rx_wr_d;
 wire mac_start = mac_wr & ~mac_wr_d;
-
-reg [1:0] tx_rd_sr;
-reg [1:0] tx_strobe_sr;
-
-always @(posedge clk) begin
-	if (rst) begin
-		tx_rd_sr <= 2'd0;
-		tx_strobe_sr <= 2'd0;
-	end else begin
-		tx_rd_sr <= { tx_rd_sr[0],  tx_rd };
-		tx_strobe_sr <= { tx_strobe_sr[0], tx_strobe };
-	end
-end
-
-wire tx_start = tx_rd_sr[0] & ~tx_rd_sr[1];
-wire tx_done = ~tx_rd_sr[0] &  tx_rd_sr[1];
-wire tx_strobe_pe = tx_strobe_sr[0] & ~tx_strobe_sr[1];
 
 // reset
 reg reset = 1'b0;
@@ -303,7 +289,7 @@ always @(posedge clk) begin
 	end else begin
 		if (tx_start) begin
 			tx_addr <= { tpsr, 8'd0 };
-		end else if (tx_strobe_pe) begin
+		end else if (tx_strobe) begin
 			tx_addr <= tx_addr + 12'd1;
 		end else if (tx_done) begin
 			tsr <= 8'h01; // PTX
