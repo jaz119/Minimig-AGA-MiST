@@ -163,8 +163,8 @@ end
 
 // SPI receiver IO -> FPGA
 
-reg       spi_receiver_strobe_r = 0;
-reg       spi_transfer_end_r = 1;
+reg spi_receiver_strobe_r = 0;
+reg spi_transfer_end_r = 1;
 reg [7:0] spi_byte_in;
 
 // Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
@@ -185,13 +185,12 @@ always @(posedge spi_sck or posedge SPI_SS_IO) begin
 	end
 end
 
-reg       spi_receiver_strobe;
-reg       spi_transfer_end;
-reg       spi_receiver_strobeD;
-reg       spi_transfer_endD;
-
-reg [7:0] acmd;
+reg spi_receiver_strobe;
+reg spi_transfer_end;
+reg spi_receiver_strobeD;
+reg spi_transfer_endD;
 reg [3:0] abyte_cnt; // counts bytes
+reg [7:0] acmd;
 
 // Process bytes from SPI at the clk_sys domain
 always @(posedge clk_sys) begin
@@ -208,17 +207,16 @@ always @(posedge clk_sys) begin
 	eth_rx_strobe <= 1'b0;
 	i2c_start <= 0;
 
-	eth_mac_wr <= 1'b0;
-	eth_tx_rd <= 1'b0;
-	eth_rx_wr <= 1'b0;
-
 	if (spi_transfer_end) begin
 		acmd <= 8'd0;
-		abyte_cnt <= 8'd0;
+		abyte_cnt <= 4'd0;
+		eth_mac_wr <= 1'b0;
+		eth_tx_rd <= 1'b0;
+		eth_rx_wr <= 1'b0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if (~&abyte_cnt)
-			abyte_cnt <= abyte_cnt + 8'd1;
+			abyte_cnt <= abyte_cnt + 4'd1;
 
 		if (abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
