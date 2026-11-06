@@ -246,7 +246,7 @@ always @(posedge clk) begin
 			// write past pstop boundary
 			rx_addr <= rx_addr + 12'd1;
 			// full page count
-			if (rx_addr[7:0] == 255)
+			if (rx_addr[7:0] == 8'hFF)
 				clda <= next_clda;
 			// check max frame limit
 			if (rx_length == 1518)

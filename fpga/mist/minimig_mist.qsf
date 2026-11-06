@@ -362,13 +362,13 @@ set_global_assignment -name VERILOG_MACRO "MINIMIG_CDDA=1"
 
 set_global_assignment -name SYNTHESIS_SEED 2
 set_global_assignment -name VERILOG_FILE ../../rtl/rtg/rtg_video.v
-set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/xsurf.v
-set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/rtl8019.v
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_volume.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_playback.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_fifo.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata_capture.sv"
 set_global_assignment -name SYSTEMVERILOG_FILE "../../rtl/fpga-toccata/toccata.sv"
+set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/xsurf.v
+set_global_assignment -name VERILOG_FILE ../../rtl/xsurf/rtl8019.v
 set_global_assignment -name QIP_FILE ../../rtl/mist/vidclkcntrl.qip
 set_global_assignment -name VERILOG_FILE ../../rtl/soc/minimig_mist_top.v
 set_global_assignment -name VERILOG_FILE ../../rtl/mist/user_io.v
