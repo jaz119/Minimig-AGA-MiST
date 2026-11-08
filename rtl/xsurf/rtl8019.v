@@ -87,19 +87,17 @@ wire rd_ne = ~rd & rd_d;
 wire wr_ne = ~wr & wr_d;
 
 // spi bus signals
-reg tx_rd_d, rx_wr_d, mac_wr_d;
+reg tx_rd_d, rx_wr_d;
 
 always @(posedge clk) begin
 	tx_rd_d <= tx_rd;
 	rx_wr_d <= rx_wr;
-	mac_wr_d <= mac_wr;
 end
 
-wire tx_start =  tx_rd  & ~tx_rd_d;
-wire tx_done  = ~tx_rd  &  tx_rd_d;
-wire rx_start =  rx_wr  & ~rx_wr_d;
-wire rx_stop  = ~rx_wr  &  rx_wr_d;
-wire mac_start = mac_wr & ~mac_wr_d;
+wire tx_start =  tx_rd & ~tx_rd_d;
+wire tx_done  = ~tx_rd &  tx_rd_d;
+wire rx_start =  rx_wr & ~rx_wr_d;
+wire rx_stop  = ~rx_wr &  rx_wr_d;
 
 // reset trigger
 reg reset;
@@ -127,17 +125,11 @@ always @(posedge clk) begin
 end
 
 // set local MAC address
-reg [7:0] mac [5:0];
-reg [2:0] mac_cnt;
+reg [47:0] mac;
 
 always @(posedge clk) begin
-	if (mac_start)
-		mac_cnt <= 0;
-	else if (mac_strobe) begin
-		if (mac_cnt < 6) begin
-			mac[mac_cnt] <= mac_byte;
-			mac_cnt <= mac_cnt + 3'd1;
-		end
+	if (mac_wr && mac_strobe) begin
+		mac <= { mac[39:0], mac_byte };
 	end
 end
 
@@ -150,12 +142,12 @@ reg [15:0] tx_buffer_do;
 // prom read
 always @(*) begin
 	case (rsar[3:1])
-		3'h00: rom_do = mac[0];
-		3'h01: rom_do = mac[1];
-		3'h02: rom_do = mac[2];
-		3'h03: rom_do = mac[3];
-		3'h04: rom_do = mac[4];
-		3'h05: rom_do = mac[5];
+		3'h00: rom_do = mac[47:40];
+		3'h01: rom_do = mac[39:32];
+		3'h02: rom_do = mac[31:24];
+		3'h03: rom_do = mac[23:16];
+		3'h04: rom_do = mac[15:8];
+		3'h05: rom_do = mac[7:0];
 		3'h07: rom_do = 8'h57;
 		default: rom_do = 8'h00;
 	endcase
@@ -181,12 +173,12 @@ always @(*) begin
 	// page 1
 	if (ps == 1) begin
 		case (addr)
-			5'h01: reg_do = mac[0];
-			5'h02: reg_do = mac[1];
-			5'h03: reg_do = mac[2];
-			5'h04: reg_do = mac[3];
-			5'h05: reg_do = mac[4];
-			5'h06: reg_do = mac[5];
+			5'h01: reg_do = mac[47:40];
+			5'h02: reg_do = mac[39:32];
+			5'h03: reg_do = mac[31:24];
+			5'h04: reg_do = mac[23:16];
+			5'h05: reg_do = mac[15:8];
+			5'h06: reg_do = mac[7:0];
 			5'h07: reg_do = curr;
 			default: ;
 		endcase

@@ -171,7 +171,6 @@ reg [7:0] spi_byte_in;
 always @(posedge spi_sck or posedge SPI_SS_IO) begin
 	if (SPI_SS_IO == 1) begin
 		spi_transfer_end_r <= 1'b1;
-		spi_receiver_strobe_r <= 1'b0;
 		sbuf <= 8'd0;
 	end else begin
 		spi_transfer_end_r <= 1'b0;
