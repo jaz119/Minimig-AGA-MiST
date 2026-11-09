@@ -2,18 +2,8 @@
 // RTL8019AS (16-bit LE) implementation for SPI bus
 // Copyright (c) 2026 Eugene Azarov <rusjaz@gmail.com>
 //
-// This source file is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published
-// by the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: GPL-3.0-only
 //
-// This source file is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module rtl8019
 (
@@ -41,8 +31,8 @@ module rtl8019
 	input       [7:0] mac_byte
 );
 
-// tx_ready[17], rx_ready[16], tx_count[15:0]
-assign status = { 8'ha8, 6'h00, tx_ready, rx_ready, 5'h00, tbcr };
+// rst[20], irq[19], is_full[18], tx_ready[17], rx_ready[16], tx_count[15:0]
+assign status = { 8'ha8, 3'h00, isr[7], irq, full, tx_ready, rx_ready, 5'h00, tbcr };
 
 // NE2000 registers
 reg [7:0]  cr;             // command register
