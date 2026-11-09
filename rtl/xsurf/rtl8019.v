@@ -103,7 +103,7 @@ always @(posedge clk) begin
 end
 
 // syncing i/o controller rx frame traffic
-wire [3:0] used = (curr - bnry);
+wire [7:0] used = (curr >= bnry) ? (curr - bnry) : ((pstop - bnry) + (curr - pstart));
 wire full = (used >= 10);
 
 reg tx_ready;
