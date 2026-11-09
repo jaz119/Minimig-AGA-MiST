@@ -200,11 +200,11 @@ always @(posedge clk_sys) begin
 	spi_transfer_end  <= spi_transfer_endD;
 
 	// strobe is set whenever a valid byte has been received
-	kbd_mouse_strobe <= 0;
+	kbd_mouse_strobe <= 1'b0;
 	eth_mac_strobe <= 1'b0;
 	eth_tx_strobe <= 1'b0;
 	eth_rx_strobe <= 1'b0;
-	i2c_start <= 0;
+	i2c_start <= 1'b0;
 
 	if (spi_transfer_end) begin
 		acmd <= 8'd0;
@@ -222,25 +222,25 @@ always @(posedge clk_sys) begin
 
 			case (spi_byte_in)
 				8'h70, 8'h71: begin
-					kbd_mouse_type <= 2'b00;  // x axis
+					kbd_mouse_type <= 2'b00;     // x axis
 					mouse_idx <= spi_byte_in[0]; // mouse select
 				end
 				8'h05: kbd_mouse_type <= 2'b10;  // keyboard
-		 		8'h06: kbd_mouse_type <= 2'b11;  // OSD keyboard
-		 		8'h09: eth_mac_wr <= 1'b1;
-		 		8'h0b: eth_tx_rd <= 1'b1;
-		 		8'h0c: eth_rx_wr <= 1'b1;
+				8'h06: kbd_mouse_type <= 2'b11;  // OSD keyboard
+				8'h09: eth_mac_wr <= 1'b1;
+				8'h0b: eth_tx_rd <= 1'b1;
+				8'h0c: eth_rx_wr <= 1'b1;
 			endcase
 		end else begin
 
 			case (acmd)
 				// buttons and switches
 				8'h01: but_sw <= spi_byte_in;
-				8'h60: if (abyte_cnt < 5) joystick_0[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
-				8'h61: if (abyte_cnt < 5) joystick_1[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
-				8'h62: if (abyte_cnt < 5) joystick_2[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
-				8'h63: if (abyte_cnt < 5) joystick_3[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
-				8'h64: if (abyte_cnt < 5) joystick_4[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h60: joystick_0 <= { spi_byte_in, joystick_0[31:8] };
+				8'h61: joystick_1 <= { spi_byte_in, joystick_1[31:8] };
+				8'h62: joystick_2 <= { spi_byte_in, joystick_2[31:8] };
+				8'h63: joystick_3 <= { spi_byte_in, joystick_3[31:8] };
+				8'h64: joystick_4 <= { spi_byte_in, joystick_4[31:8] };
 
 				8'h70, 8'h71:
 				begin
@@ -312,7 +312,7 @@ always @(posedge clk_sys) begin
 					end
 				end
 
-				8'h22: if (abyte_cnt < 9) rtc[((abyte_cnt-1)<<3) +:8] <= spi_byte_in;
+				8'h22: rtc <= { spi_byte_in, rtc[63:8] };
 				8'h15: status <= spi_byte_in;
 
 				// I2C bridge
