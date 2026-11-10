@@ -37,7 +37,7 @@ assign status = { 8'ha8, 3'h00, isr[7], irq, full, tx_ready, rx_ready, 5'h00, tb
 // NE2000 registers
 reg [7:0]  cr;             // command register
 reg [7:0]  isr;            // interrupt service register
-reg [7:0]  imr;            // interrupt mask register
+reg [6:0]  imr;            // interrupt mask register
 reg [5:0]  rcr;            // receiver control register
 reg [7:0]  rsr;            // receiver status register
 reg [4:0]  tcr;            // transmitter control register
@@ -48,7 +48,7 @@ reg [7:0]  clda;           // current local dma page register
 reg [7:0]  pstart;         // rx buffer ring start page
 reg [7:0]  pstop;          // rx buffer ring stop page
 reg [15:1] rsar;           // remote start address register
-reg [10:1] rbcr;           // remote byte count register
+reg [10:0] rbcr;           // remote byte count register
 reg [3:0]  tpsr;           // transmit page start address
 reg [10:0] tbcr;           // transmitter byte count register
 
@@ -102,10 +102,12 @@ always @(posedge clk) begin
 	end
 end
 
-// syncing i/o controller rx frame traffic
-wire [7:0] used = (curr >= bnry) ? (curr - bnry) : ((pstop - bnry) + (curr - pstart));
+// check whether rx ring buffer is full
+wire [7:0] used = (curr >= bnry)
+	? (curr - bnry) : ((pstop - bnry) + (curr - pstart));
 wire full = (used >= 10);
 
+// syncing i/o controller rx frame traffic
 reg tx_ready;
 reg rx_ready;
 
@@ -217,34 +219,38 @@ reg  [7:0] lo_byte;
 // local DMA frame receiver
 always @(posedge clk) begin
 	if (rst) begin
-		rsr <= 8'h08;
+		rsr <= 8'h00;
 		rx_fin <= 1'b0;
 		rx_fin_d <= 1'b0;
 	end else begin
 		rx_fin_d <= rx_fin;
 		if (rx_start) begin
-			rsr <= 8'h08;
+			rsr <= 8'h00;
 			// +4 for crc
 			rx_length <= 11'd4;
 			// +4 for header
 			rx_addr <= { curr[3:0], 8'd4 };
 			// first page already used
 			clda <= next_curr;
-		end else if (rx_strobe && !rsr[2]) begin
+		end else if (rx_strobe) begin
 			if (rx_addr[0] == 1'b0) begin
 				lo_byte <= rx_byte;
 			end else begin
 				rx_buffer[rx_addr[11:1]] <= { rx_byte, lo_byte };
 			end
-			rx_length <= rx_length + 11'd1;
-			// write past pstop boundary
-			rx_addr <= rx_addr + 12'd1;
-			// full page count
-			if (rx_addr[7:0] == 8'hFF)
-				clda <= next_clda;
+			if (!rsr[2]) begin
+				rx_length <= rx_length + 11'd1;
+				// write past pstop boundary
+				rx_addr <= rx_addr + 12'd1;
+				// full page count
+				if (rx_addr[7:0] == 8'hFF) begin
+					clda <= next_clda;
+				end
+			end
 			// check max frame limit
-			if (rx_length == 1518)
+			if (rx_length == 1518) begin
 				rsr[2] <= 1'b1; // FAE
+			end
 		end else if (rx_stop) begin
 			if (rx_addr[0] == 1'b1) begin
 				// last odd byte
@@ -260,7 +266,7 @@ always @(posedge clk) begin
 				rx_buffer[rx_addr[11:1]] <= { clda, rsr };
 				rx_addr[1] <= 1'b1;
 			end else begin
-				rx_buffer[rx_addr[11:1]] <= { 5'h00, rx_length[10:8], rx_length[7:0] };
+				rx_buffer[rx_addr[11:1]] <= { 5'h00, rx_length };
 				if (rx_length < 64) begin
 					// allow/drop runt frames
 					rx_fin_d <= rcr[1];
@@ -307,8 +313,8 @@ always @(posedge clk) begin
 	end
 end
 
-wire rbcr_is_0 = (rbcr == 0);
-wire rbcr_is_1 = (rbcr == 1);
+wire rbcr_is_0 = (rbcr[10:1] == 0);
+wire rbcr_is_1 = (rbcr[10:1] == 1);
 
 // CPU write
 always @(posedge clk) begin
@@ -317,7 +323,7 @@ always @(posedge clk) begin
 		rcr <= 6'h20; // MON
 		tcr <= 5'h02; // LB1
 		isr <= 8'h80; // RST
-		imr <= 8'h00;
+		imr <= 7'h00;
 		irq <= 1'b00;
 	end else begin
 		if (wr_ne) begin
@@ -350,11 +356,11 @@ always @(posedge clk) begin
 						5'h07: isr[6:0] <= isr[6:0] & ~din[6:0];
 						5'h08: rsar[7:1]  <= din[7:1];
 						5'h09: rsar[15:8] <= din[7:0];
-						5'h0a: rbcr[7:1]  <= din[7:1];
-						5'h0b: rbcr[10:8] <= din[2:0];
+						5'h0a: rbcr[7:0]  <= din[7:0];
+						5'h0b: rbcr[10:1] <= { din[2:0], rbcr[7:1] } + { 9'd0, rbcr[0] };
 						5'h0c: rcr <= din[5:0];
 						5'h0d: tcr <= din[4:0];
-						5'h0f: imr <= din[7:0];
+						5'h0f: imr <= din[6:0];
 						default: ;
 					endcase
 				end
@@ -368,7 +374,7 @@ always @(posedge clk) begin
 		if (rd_ne || wr_ne) begin
 			if (dma_port && !rbcr_is_0) begin
 				rsar <= rsar + 15'd1;
-				rbcr <= rbcr - 10'd1;
+				rbcr[10:1] <= rbcr[10:1] - 10'd1;
 				if (rbcr_is_1) begin
 					isr[6] <= 1'b1; // RDC
 				end
@@ -386,7 +392,7 @@ always @(posedge clk) begin
 			tbcr <= 11'd0;
 		end
 		// interrupt line
-		irq <= |(isr & imr);
+		irq <= |(isr[6:0] & imr);
 	end
 end
 
