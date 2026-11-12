@@ -200,7 +200,7 @@ wire [15:0] dma_do = (is_prom) ? { rom_do, rom_do }
 always @(*) begin
 	dout = 16'd0;
 	if (rd) begin
-		dout = dma_port ? dma_do : { reg_do, reg_do };
+		dout = (dma_port) ? dma_do : { reg_do, reg_do };
 	end
 end
 
@@ -331,9 +331,13 @@ always @(posedge clk) begin
 				// cr is available on all pages
 				if (addr == 0) begin
 					{ cr[7:3], cr[1:0] } <= { din[7:3], din[1:0] };
-					if (!din[0]) begin
+					if (din[0]) begin
+						// stop
+						cr[2] <= 1'b0; // TXP
+						isr[7] <= 1'b1; // RST
+					end else begin
 						// not stop
-						if (cr[0]) begin
+						if (stop) begin
 							isr[7] <= 1'b0; // RST
 						end
 						if (din[2]) begin
@@ -382,14 +386,18 @@ always @(posedge clk) begin
 		end
 		// incoming frame received
 		if (rx_done) begin
-			isr[0] <= 1'b1; // PRX
 			curr <= clda;
+			if (!stop) begin
+				isr[0] <= 1'b1; // PRX
+			end
 		end
 		// outgoing frame transmitted
 		if (tx_done) begin
-			isr[1] <= 1'b1; // PTX
-			cr[2] <= 1'b0;  // TXP
+			cr[2] <= 1'b0; // TXP
 			tbcr <= 11'd0;
+			if (!stop) begin
+				isr[1] <= 1'b1; // PTX
+			end
 		end
 		// interrupt line
 		irq <= |(isr[6:0] & imr);
