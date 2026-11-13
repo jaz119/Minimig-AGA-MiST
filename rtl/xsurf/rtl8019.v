@@ -133,14 +133,15 @@ reg [15:0] tx_buffer_do;
 
 // prom read
 always @(*) begin
-	case (rsar[3:1])
-		3'h00: rom_do = mac[47:40];
-		3'h01: rom_do = mac[39:32];
-		3'h02: rom_do = mac[31:24];
-		3'h03: rom_do = mac[23:16];
-		3'h04: rom_do = mac[15:8];
-		3'h05: rom_do = mac[7:0];
-		3'h07: rom_do = 8'h57;
+	case (rsar[4:1])
+		4'h00: rom_do = mac[47:40];
+		4'h01: rom_do = mac[39:32];
+		4'h02: rom_do = mac[31:24];
+		4'h03: rom_do = mac[23:16];
+		4'h04: rom_do = mac[15:8];
+		4'h05: rom_do = mac[7:0];
+		4'h0e: rom_do = 8'h57;
+		4'h0f: rom_do = 8'h57;
 		default: rom_do = 8'h00;
 	endcase
 end
@@ -180,6 +181,7 @@ always @(*) begin
 		case (addr)
 			5'h03: reg_do = 8'h08; // jumper mode
 			5'h04: reg_do = 8'h90; // irq 3, port 0x300
+			5'h06: reg_do = 8'h40; // full duplex
 			default: ;
 		endcase
 	end

@@ -141,7 +141,7 @@ always @(posedge spi_sck or posedge SPI_SS_IO) begin : spi_transmitter
 			case ((byte_cnt == 0) ? { sbuf[6:0], SPI_MOSI } : cmd)
 
 			// ethernet status
-			8'h0a: begin
+			8'h2a: begin
 				case (byte_cnt[1:0])
 					2'd0: spi_byte_out <= eth_status[31:24];
 					2'd1: spi_byte_out <= eth_status[23:16];
