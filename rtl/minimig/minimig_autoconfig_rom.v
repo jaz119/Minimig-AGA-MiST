@@ -84,7 +84,7 @@ begin
 	// X-Surf ethernet card
 
 	ram[ethbase+'h0] = 4'b1100;	// Zorro-II card, no link, no ROM
-	ram[ethbase+'h2/2] = 4'b0001;	// Next board not related, size 'h40k
+	ram[ethbase+'h2/2] = 4'b0001;	// Next board not related, size 64K
 	ram[ethbase+'h4/2] = 4'b1110;	// ProductID = 0x17 (X-Surf)
 	ram[ethbase+'h6/2] = 4'b1000;	// ProductID = 0x17 (X-Surf)
 	ram[ethbase+'h8/2] = 4'b1111;	// Flags (Not memory)

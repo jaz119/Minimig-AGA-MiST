@@ -2,7 +2,7 @@
 // RTL8019AS (16-bit LE) implementation for SPI bus
 // Copyright (c) 2026 Eugene Azarov <rusjaz@gmail.com>
 //
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-2.0-or-later
 //
 
 module rtl8019
@@ -62,8 +62,8 @@ wire dma_port = (addr[4:3] == 2'b10); // remote DMA ports ($10 - $17)
 wire rst_port = (addr[4:3] == 2'b11); // reset ports ($18 - $1F)
 
 // rx/tx buffers
-reg [15:0] rx_buffer[2047:0]; // 2-4 ethernet frames
-reg [15:0] tx_buffer[2047:0]; // 2 ethernet frames (ping-pong)
+(* ramstyle = "M9K, no_rw_check" *) reg [15:0] rx_buffer[2047:0];
+(* ramstyle = "M9K, no_rw_check" *) reg [15:0] tx_buffer[2047:0];
 
 // cpu signals
 reg rd_d, wr_d;
@@ -315,8 +315,8 @@ always @(posedge clk) begin
 	end
 end
 
-wire rbcr_is_0 = (rbcr[10:1] == 0);
-wire rbcr_is_1 = (rbcr[10:1] == 1);
+wire rbcr_is_0 = (rbcr == 0);
+wire [10:0] next_rbcr = rbcr - (rbcr[0] ? 11'd1 : 11'd2);
 
 // CPU write
 always @(posedge clk) begin
@@ -356,7 +356,7 @@ always @(posedge clk) begin
 						5'h08: rsar[7:1]  <= din[7:1];
 						5'h09: rsar[15:8] <= din[7:0];
 						5'h0a: rbcr[7:0]  <= din[7:0];
-						5'h0b: rbcr[10:1] <= { din[2:0], rbcr[7:1] } + { 9'd0, rbcr[0] };
+						5'h0b: rbcr[10:8] <= din[2:0];
 						5'h0c: rcr <= din[5:0];
 						5'h0d: tcr <= din[4:0];
 						5'h0f: imr <= din[6:0];
@@ -370,11 +370,11 @@ always @(posedge clk) begin
 			end
 		end
 		// remote dma operation
-		if (rd_ne || wr_ne) begin
+		if (wr_ne || rd_ne) begin
 			if (dma_port && !rbcr_is_0) begin
 				rsar <= rsar + 15'd1;
-				rbcr[10:1] <= rbcr[10:1] - 10'd1;
-				if (rbcr_is_1) begin
+				rbcr <= next_rbcr;
+				if (next_rbcr == 0) begin
 					isr[6] <= 1'b1; // RDC
 				end
 			end

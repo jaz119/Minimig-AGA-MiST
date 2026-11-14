@@ -2,7 +2,7 @@
 // X-Surf Ethernet card implementation for Minimig-MIST
 // Copyright (c) 2026 Eugene Azarov <rusjaz@gmail.com>
 //
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-2.0-or-later
 //
 
 module xsurf
