@@ -333,17 +333,10 @@ always @(posedge clk) begin
 				// cr is available on all pages
 				if (addr == 0) begin
 					{ cr[7:3], cr[1:0] } <= { din[7:3], din[1:0] };
-					if (din[0]) begin
-						// stop
-						cr[2] <= 1'b0; // TXP
-						isr[7] <= 1'b1; // RST
-					end else begin
+					if (!din[0]) begin
 						// not stop
-						if (stop) begin
-							isr[7] <= 1'b0; // RST
-						end
 						if (din[2]) begin
-							cr[2] <= 1'b1;  // TXP
+							cr[2] <= 1'b1; // TXP
 						end
 						if (rbcr_is_0 && (din[3] || din[4])) begin
 							isr[6] <= 1'b1; // RDC
@@ -388,21 +381,19 @@ always @(posedge clk) begin
 		end
 		// incoming frame received
 		if (rx_done) begin
+			isr[0] <= 1'b1; // PRX
 			curr <= clda;
-			if (!stop) begin
-				isr[0] <= 1'b1; // PRX
-			end
 		end
 		// outgoing frame transmitted
 		if (tx_done) begin
+			isr[1] <= 1'b1; // PTX
 			cr[2] <= 1'b0; // TXP
 			tbcr <= 11'd0;
-			if (!stop) begin
-				isr[1] <= 1'b1; // PTX
-			end
 		end
+		// stop mode
+		isr[7] <= stop & ~tx_rd & ~rx_wr; // RST
 		// interrupt line
-		irq <= |(isr[6:0] & imr);
+		irq <= |(isr[6:0] & imr) & ~isr[7];
 	end
 end
 

@@ -9,31 +9,32 @@ module xsurf
 (
     input             clk,
     input             rst,
-    input             sel,                  // card select
-    input             cpu_rd,               // cpu read enable
-    input             cpu_hwr,              // high byte write enable
-    input             cpu_lwr,              // low byte writes enable
-    input      [15:1] addr,                 // address bus (word aligned)
+    input             sel,
+    input             cpu_rd,
+    input             cpu_hwr,
+    input             cpu_lwr,
+    input      [15:1] addr,
     input      [15:0] din,
     output reg [15:0] dout,
-    output            int2,                 // interrupt request
-    output     [31:0] eth_status,           // ethernet nic status
-    input             eth_mac_wr,
-    input             eth_mac_strobe,
-    input       [7:0] eth_mac_byte,
-    input             eth_tx_rd,
-    input             eth_tx_strobe,
-    output      [7:0] eth_tx_byte,
-    input             eth_rx_wr,
-    input             eth_rx_strobe,
-    input       [7:0] eth_rx_byte
+    output            int2,
+
+    output [31:0] eth_status,
+    input         eth_mac_wr,
+    input         eth_mac_strobe,
+    input   [7:0] eth_mac_byte,
+    input         eth_tx_rd,
+    input         eth_tx_strobe,
+    output  [7:0] eth_tx_byte,
+    input         eth_rx_wr,
+    input         eth_rx_strobe,
+    input   [7:0] eth_rx_byte
 );
 
 localparam ETH_BASE = 16'h8600; // port 0x300
 wire sel_eth = sel && (addr[15:6] == ETH_BASE[15:6]);
 
-wire rd = sel_eth && cpu_rd;
-wire wr = sel_eth && (cpu_hwr || cpu_lwr);
+wire rd = sel_eth & cpu_rd;
+wire wr = sel_eth & (cpu_hwr | cpu_lwr);
 
 wire [15:0] eth_dout;
 
