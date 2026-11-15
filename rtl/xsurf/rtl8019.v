@@ -1,5 +1,5 @@
 //
-// RTL8019AS (16-bit LE) implementation for SPI bus
+// RTL8019AS implementation for SPI bus
 // Copyright (c) 2026 Eugene Azarov <rusjaz@gmail.com>
 //
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -42,12 +42,13 @@ reg [5:0]  rcr;            // receiver control register
 reg [7:0]  rsr;            // receiver status register
 reg [4:0]  tcr;            // transmitter control register
 reg [7:0]  tsr;            // transmitter status register
+reg [1:0]  dcr;            // data configuration register
 reg [7:0]  curr;           // current page register
 reg [7:0]  bnry;           // boundary page
 reg [7:0]  clda;           // current local dma page register
 reg [7:0]  pstart;         // rx buffer ring start page
 reg [7:0]  pstop;          // rx buffer ring stop page
-reg [15:1] rsar;           // remote start address register
+reg [15:0] rsar;           // remote start address register
 reg [10:0] rbcr;           // remote byte count register
 reg [3:0]  tpsr;           // transmit page start address
 reg [10:0] tbcr;           // transmitter byte count register
@@ -56,6 +57,7 @@ wire stop = cr[0];         // stop mode
 wire txp  = cr[2];         // transmit packet toggle
 wire [1:0] ps = cr[7:6];   // register page select
 wire [1:0] lb = tcr[2:1];  // loopback mode select
+wire wts = dcr[0];         // word transfer select
 wire mon = rcr[5];         // monitor mode
 
 wire dma_port = (addr[4:3] == 2'b10); // remote DMA ports ($10 - $17)
@@ -155,7 +157,7 @@ always @(*) begin
 			5'h03: reg_do = bnry;
 			5'h04: reg_do = tsr;
 			5'h07: reg_do = isr;
-			5'h08: reg_do = { rsar[7:1], 1'b0 };
+			5'h08: reg_do = rsar[7:0];
 			5'h09: reg_do = rsar[15:8];
 			5'h0a: reg_do = 8'h50; // id0
 			5'h0b: reg_do = 8'h70; // id1
@@ -194,9 +196,10 @@ end
 wire is_loop = (lb != 0);
 wire is_prom = (rsar[15:8] == 0);
 
-wire [15:0] dma_do = (is_prom) ? { rom_do, rom_do }
-	: (is_loop) ? tx_buffer_do
-	: rx_buffer_do;
+wire [15:0] dma_word = (is_prom) ? { rom_do, rom_do }
+	: (is_loop) ? tx_buffer_do : rx_buffer_do;
+wire  [7:0] dma_byte = (rsar[0]) ? dma_word[15:8] : dma_word[7:0];
+wire [15:0] dma_do = (wts) ? dma_word : { dma_byte, dma_byte };
 
 // CPU read
 always @(*) begin
@@ -216,7 +219,10 @@ wire rx_done = ~rx_fin & rx_fin_d;
 
 reg [11:0] rx_addr;
 reg [10:0] rx_length;
-reg  [7:0] lo_byte;
+reg  [7:0] rx_lo_byte;
+reg  [3:0] gap_begin;
+reg  [7:0] gap_end;
+reg has_wrap;
 
 // local DMA frame receiver
 always @(posedge clk) begin
@@ -224,6 +230,7 @@ always @(posedge clk) begin
 		rsr <= 8'h00;
 		rx_fin <= 1'b0;
 		rx_fin_d <= 1'b0;
+		gap_end <= 8'h00;
 	end else begin
 		rx_fin_d <= rx_fin;
 		if (rx_start) begin
@@ -234,11 +241,12 @@ always @(posedge clk) begin
 			rx_addr <= { curr[3:0], 8'd4 };
 			// first page already used
 			clda <= next_curr;
+			has_wrap <= 1'b0;
 		end else if (rx_strobe) begin
 			if (rx_addr[0] == 1'b0) begin
-				lo_byte <= rx_byte;
+				rx_lo_byte <= rx_byte;
 			end else begin
-				rx_buffer[rx_addr[11:1]] <= { rx_byte, lo_byte };
+				rx_buffer[rx_addr[11:1]] <= { rx_byte, rx_lo_byte };
 			end
 			if (!rsr[2]) begin
 				rx_length <= rx_length + 11'd1;
@@ -247,6 +255,10 @@ always @(posedge clk) begin
 				// full page count
 				if (rx_addr[7:0] == 8'hFF) begin
 					clda <= next_clda;
+					if (clda == pstart) begin
+						gap_begin <= rx_addr[11:8] + 4'd1;
+						has_wrap <= 1'b1;
+					end
 				end
 			end
 			// check max frame limit
@@ -256,7 +268,7 @@ always @(posedge clk) begin
 		end else if (rx_stop) begin
 			if (rx_addr[0] == 1'b1) begin
 				// last odd byte
-				rx_buffer[rx_addr[11:1]] <= { 8'h00, lo_byte };
+				rx_buffer[rx_addr[11:1]] <= { 8'h00, rx_lo_byte };
 			end
 			// prepare header write
 			rx_addr <= { curr[3:0], 8'd0 };
@@ -274,6 +286,11 @@ always @(posedge clk) begin
 					rx_fin_d <= rcr[1];
 				end
 				rx_fin <= 1'b0;
+			end
+			if (has_wrap) begin
+				gap_end <= clda;
+			end else if (clda == pstart) begin
+				gap_end <= pstart;
 			end
 		end
 	end
@@ -300,23 +317,38 @@ always @(posedge clk) begin
 	end
 end
 
+wire use_gap = (rsar[15:8] >= pstart) && (rsar[15:8] < gap_end);
+wire [3:0] phys_rsar = use_gap ? (gap_begin + (rsar[11:8] - pstart[3:0])) : rsar[11:8];
+
 // remote DMA data reader
 always @(posedge clk) begin
 	tx_buffer_do <= tx_buffer[tx_r_addr];
-	rx_buffer_do <= rx_buffer[rsar[11:1]];
+	rx_buffer_do <= rx_buffer[{ phys_rsar, rsar[7:1] }];
 end
+
+reg [7:0] tx_lo_byte;
 
 // remote DMA data writer
 always @(posedge clk) begin
 	if (wr_ne) begin
 		if (dma_port && !rbcr_is_0) begin
-			tx_buffer[rsar[11:1]] <= din;
+			if (wts) begin
+				tx_buffer[rsar[11:1]] <= din;
+			end else if (!rsar[0]) begin
+				tx_lo_byte <= din[7:0];
+				if (rbcr == 1) begin
+					tx_buffer[rsar[11:1]] <= { 8'h00, din[7:0] };
+				end
+			end else begin
+				tx_buffer[rsar[11:1]] <= { din[7:0], tx_lo_byte };
+			end
 		end
 	end
 end
 
 wire rbcr_is_0 = (rbcr == 0);
-wire [10:0] next_rbcr = rbcr - (rbcr[0] ? 11'd1 : 11'd2);
+wire  [1:0] dma_step = (wts && (rbcr != 1)) ? 2'd2 : 2'd1;
+wire [10:0] next_rbcr = rbcr - { 9'd0, dma_step };
 
 // CPU write
 always @(posedge clk) begin
@@ -324,6 +356,7 @@ always @(posedge clk) begin
 		cr  <= 8'h21; // ABORT, STP
 		rcr <= 6'h20; // MON
 		tcr <= 5'h02; // LB1
+		dcr <= 2'b01; // WTS
 		isr <= 8'h80; // RST
 		imr <= 7'h00;
 		irq <= 1'b00;
@@ -353,12 +386,13 @@ always @(posedge clk) begin
 						5'h05: tbcr[7:0]  <= din[7:0];
 						5'h06: tbcr[10:8] <= din[2:0];
 						5'h07: isr[6:0] <= isr[6:0] & ~din[6:0];
-						5'h08: rsar[7:1]  <= din[7:1];
+						5'h08: rsar[7:0]  <= din[7:0];
 						5'h09: rsar[15:8] <= din[7:0];
 						5'h0a: rbcr[7:0]  <= din[7:0];
 						5'h0b: rbcr[10:8] <= din[2:0];
 						5'h0c: rcr <= din[5:0];
 						5'h0d: tcr <= din[4:0];
+						5'h0e: dcr <= din[1:0];
 						5'h0f: imr <= din[6:0];
 						default: ;
 					endcase
@@ -372,7 +406,7 @@ always @(posedge clk) begin
 		// remote dma operation
 		if (wr_ne || rd_ne) begin
 			if (dma_port && !rbcr_is_0) begin
-				rsar <= rsar + 15'd1;
+				rsar <= rsar + { 14'd0, dma_step };
 				rbcr <= next_rbcr;
 				if (next_rbcr == 0) begin
 					isr[6] <= 1'b1; // RDC

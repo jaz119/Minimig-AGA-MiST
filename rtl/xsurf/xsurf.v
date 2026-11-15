@@ -51,7 +51,6 @@ always @(*) begin
     end
 end
 
-// all transactions are 16-bit only
 rtl8019 rtl8019_eth
 (
     .clk(clk),
