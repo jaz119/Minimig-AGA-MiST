@@ -42,7 +42,7 @@ reg [5:0]  rcr;            // receiver control register
 reg [7:0]  rsr;            // receiver status register
 reg [4:0]  tcr;            // transmitter control register
 reg [7:0]  tsr;            // transmitter status register
-reg [1:0]  dcr;            // data configuration register
+reg [3:0]  dcr;            // data configuration register
 reg [7:0]  curr;           // current page register
 reg [7:0]  bnry;           // boundary page
 reg [7:0]  clda;           // current local dma page register
@@ -105,8 +105,8 @@ always @(posedge clk) begin
 end
 
 // check whether rx ring buffer is full
-wire [7:0] used = (curr >= bnry)
-	? (curr - bnry) : ((pstop - bnry) + (curr - pstart));
+wire [8:0] delta = { 1'b0, curr } - { 1'b0, bnry };
+wire [7:0] used = delta[8] ? (delta[7:0] + (pstop - pstart)) : delta[7:0];
 wire full = (used >= 10);
 
 // syncing i/o controller rx frame traffic
@@ -194,7 +194,7 @@ always @(*) begin
 end
 
 wire is_loop = (lb != 0);
-wire is_prom = (rsar[15:8] == 0);
+wire is_prom = (rsar[15:12] == 0);
 
 wire [15:0] dma_word = (is_prom) ? { rom_do, rom_do }
 	: (is_loop) ? tx_buffer_do : rx_buffer_do;
@@ -220,8 +220,8 @@ wire rx_done = ~rx_fin & rx_fin_d;
 reg [11:0] rx_addr;
 reg [10:0] rx_length;
 reg  [7:0] rx_lo_byte;
-reg  [3:0] gap_begin;
-reg  [7:0] gap_end;
+reg  [3:0] gap_bias;
+reg  [5:0] gap_end;
 reg has_wrap;
 
 // local DMA frame receiver
@@ -230,7 +230,6 @@ always @(posedge clk) begin
 		rsr <= 8'h00;
 		rx_fin <= 1'b0;
 		rx_fin_d <= 1'b0;
-		gap_end <= 8'h00;
 	end else begin
 		rx_fin_d <= rx_fin;
 		if (rx_start) begin
@@ -256,7 +255,7 @@ always @(posedge clk) begin
 				if (rx_addr[7:0] == 8'hFF) begin
 					clda <= next_clda;
 					if (clda == pstart) begin
-						gap_begin <= rx_addr[11:8] + 4'd1;
+						gap_bias <= (rx_addr[11:8] + 4'd1) - pstart[3:0];
 						has_wrap <= 1'b1;
 					end
 				end
@@ -288,9 +287,9 @@ always @(posedge clk) begin
 				rx_fin <= 1'b0;
 			end
 			if (has_wrap) begin
-				gap_end <= clda;
+				gap_end <= clda[5:0];
 			end else if (clda == pstart) begin
-				gap_end <= pstart;
+				gap_end <= pstart[5:0];
 			end
 		end
 	end
@@ -317,8 +316,9 @@ always @(posedge clk) begin
 	end
 end
 
-wire use_gap = (rsar[15:8] >= pstart) && (rsar[15:8] < gap_end);
-wire [3:0] phys_rsar = use_gap ? (gap_begin + (rsar[11:8] - pstart[3:0])) : rsar[11:8];
+// address translation for frame recorded after pstop
+wire use_gap = (rsar[13:8] >= pstart[5:0]) && (rsar[13:8] < gap_end);
+wire [3:0] phys_rsar = use_gap ? (rsar[11:8] + gap_bias) : rsar[11:8];
 
 // remote DMA data reader
 always @(posedge clk) begin
@@ -356,10 +356,10 @@ always @(posedge clk) begin
 		cr  <= 8'h21; // ABORT, STP
 		rcr <= 6'h20; // MON
 		tcr <= 5'h02; // LB1
-		dcr <= 2'b01; // WTS
+		dcr <= 4'h01; // WTS
 		isr <= 8'h80; // RST
 		imr <= 7'h00;
-		irq <= 1'b00;
+		irq <= 1'b0;
 	end else begin
 		if (wr_ne) begin
 			if (!dma_port) begin
@@ -392,7 +392,7 @@ always @(posedge clk) begin
 						5'h0b: rbcr[10:8] <= din[2:0];
 						5'h0c: rcr <= din[5:0];
 						5'h0d: tcr <= din[4:0];
-						5'h0e: dcr <= din[1:0];
+						5'h0e: dcr <= din[3:0];
 						5'h0f: imr <= din[6:0];
 						default: ;
 					endcase
@@ -404,7 +404,7 @@ always @(posedge clk) begin
 			end
 		end
 		// remote dma operation
-		if (wr_ne || rd_ne) begin
+		if (!stop && (wr_ne || rd_ne)) begin
 			if (dma_port && !rbcr_is_0) begin
 				rsar <= rsar + { 14'd0, dma_step };
 				rbcr <= next_rbcr;
