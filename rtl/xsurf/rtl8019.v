@@ -151,8 +151,12 @@ end
 // register read
 always @(*) begin
 	reg_do = 8'd0;
+	// cr is available on all pages
+	if (addr == 0) begin
+		reg_do = cr;
+	end
 	// page 0
-	if (ps == 0) begin
+	else if (ps == 0) begin
 		case (addr)
 			5'h03: reg_do = bnry;
 			5'h04: reg_do = tsr;
@@ -166,7 +170,7 @@ always @(*) begin
 		endcase
 	end
 	// page 1
-	if (ps == 1) begin
+	else if (ps == 1) begin
 		case (addr)
 			5'h01: reg_do = mac[47:40];
 			5'h02: reg_do = mac[39:32];
@@ -179,17 +183,13 @@ always @(*) begin
 		endcase
 	end
 	// page 3
-	if (ps == 3) begin
+	else if (ps == 3) begin
 		case (addr)
 			5'h03: reg_do = 8'h08; // jumper mode
 			5'h04: reg_do = 8'h90; // irq 3, port 0x300
 			5'h06: reg_do = 8'h40; // full duplex
 			default: ;
 		endcase
-	end
-	// cr is available on all pages
-	if (addr == 0) begin
-		reg_do = cr;
 	end
 end
 
