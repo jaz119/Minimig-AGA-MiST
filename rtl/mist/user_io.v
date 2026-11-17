@@ -191,6 +191,9 @@ reg spi_transfer_endD;
 reg [3:0] abyte_cnt; // counts bytes
 reg [7:0] acmd;
 
+reg [7:0] spi_byte;
+reg       spi_byte_strobe;
+
 // Process bytes from SPI at the clk_sys domain
 always @(posedge clk_sys) begin
 	//synchronize between SPI and sys clock domains
@@ -206,24 +209,22 @@ always @(posedge clk_sys) begin
 	eth_rx_strobe <= 1'b0;
 	i2c_start <= 1'b0;
 
-	if (spi_transfer_end) begin
-		acmd <= 8'd0;
-		abyte_cnt <= 4'd0;
-		eth_mac_wr <= 1'b0;
-		eth_tx_rd <= 1'b0;
-		eth_rx_wr <= 1'b0;
-	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
+	spi_byte_strobe <= (spi_receiver_strobeD ^ spi_receiver_strobe);
 
+	if (spi_receiver_strobeD ^ spi_receiver_strobe)
+		spi_byte <= spi_byte_in;
+
+	if (spi_byte_strobe) begin
 		if (~&abyte_cnt)
 			abyte_cnt <= abyte_cnt + 4'd1;
 
 		if (abyte_cnt == 0) begin
-			acmd <= spi_byte_in;
+			acmd <= spi_byte;
 
-			case (spi_byte_in)
+			case (spi_byte)
 				8'h70, 8'h71: begin
 					kbd_mouse_type <= 2'b00;     // x axis
-					mouse_idx <= spi_byte_in[0]; // mouse select
+					mouse_idx <= spi_byte[0]; // mouse select
 				end
 				8'h05: kbd_mouse_type <= 2'b10;  // keyboard
 				8'h06: kbd_mouse_type <= 2'b11;  // OSD keyboard
@@ -235,34 +236,34 @@ always @(posedge clk_sys) begin
 
 			case (acmd)
 				// buttons and switches
-				8'h01: but_sw <= spi_byte_in;
-				8'h60: joystick_0 <= { spi_byte_in, joystick_0[31:8] };
-				8'h61: joystick_1 <= { spi_byte_in, joystick_1[31:8] };
-				8'h62: joystick_2 <= { spi_byte_in, joystick_2[31:8] };
-				8'h63: joystick_3 <= { spi_byte_in, joystick_3[31:8] };
-				8'h64: joystick_4 <= { spi_byte_in, joystick_4[31:8] };
+				8'h01: but_sw <= spi_byte;
+				8'h60: joystick_0 <= { spi_byte, joystick_0[31:8] };
+				8'h61: joystick_1 <= { spi_byte, joystick_1[31:8] };
+				8'h62: joystick_2 <= { spi_byte, joystick_2[31:8] };
+				8'h63: joystick_3 <= { spi_byte, joystick_3[31:8] };
+				8'h64: joystick_4 <= { spi_byte, joystick_4[31:8] };
 
 				8'h70, 8'h71:
 				begin
 					if (abyte_cnt == 1) begin
-						kbd_mouse_data <= spi_byte_in;
+						kbd_mouse_data <= spi_byte;
 						kbd_mouse_strobe <= 1;
 						kbd_mouse_strobe_level <= ~kbd_mouse_strobe_level;
 					end else if (abyte_cnt == 2) begin
 						// second byte contains y movement data
-						kbd_mouse_data <= spi_byte_in;
+						kbd_mouse_data <= spi_byte;
 						kbd_mouse_strobe <= 1;
 						kbd_mouse_strobe_level <= ~kbd_mouse_strobe_level;
 						kbd_mouse_type <= 2'b01;
 					end else if (abyte_cnt == 3) begin
 						// third byte contains the buttons
 						if (~mouse_idx)
-							mouse0_buttons[2:0] <= spi_byte_in[2:0];
+							mouse0_buttons[2:0] <= spi_byte[2:0];
 						else
-							mouse1_buttons[2:0] <= spi_byte_in[2:0];
+							mouse1_buttons[2:0] <= spi_byte[2:0];
 					end else begin
 						// fourth byte contains wheel movement
-						kbd_mouse_data <= spi_byte_in;
+						kbd_mouse_data <= spi_byte;
 						kbd_mouse_strobe <= 1;
 						kbd_mouse_strobe_level <= ~kbd_mouse_strobe_level;
 					end
@@ -270,14 +271,14 @@ always @(posedge clk_sys) begin
 
 				8'h05, 8'h06:
 				begin
-					kbd_mouse_data <= spi_byte_in;
+					kbd_mouse_data <= spi_byte;
 					kbd_mouse_strobe <= 1;
 					kbd_mouse_strobe_level <= ~kbd_mouse_strobe_level;
 				end
 
 				// send mac address byte to ethernet controller
 				8'h09: begin
-					eth_mac_byte <= spi_byte_in;
+					eth_mac_byte <= spi_byte;
 					eth_mac_strobe <= 1'b1;
 				end
 
@@ -288,7 +289,7 @@ always @(posedge clk_sys) begin
 
 				// send received byte to ethernet controller
 				8'h0c: begin
-					eth_rx_byte <= spi_byte_in;
+					eth_rx_byte <= spi_byte;
 					eth_rx_strobe <= 1'b1;
 				end
 
@@ -296,38 +297,45 @@ always @(posedge clk_sys) begin
 				8'h1a: begin
 					// first byte is joystick index
 					if (abyte_cnt == 1)
-						stick_idx <= spi_byte_in[2:0];
+						stick_idx <= spi_byte[2:0];
 					else if (abyte_cnt == 2) begin
 						// second byte is x axis
 						if (stick_idx == 0)
-							JOY_ANA0[15:8] <= {~spi_byte_in[7], spi_byte_in[6:0]};
+							JOY_ANA0[15:8] <= {~spi_byte[7], spi_byte[6:0]};
 						else if (stick_idx == 1)
-							JOY_ANA1[15:8] <= {~spi_byte_in[7], spi_byte_in[6:0]};
+							JOY_ANA1[15:8] <= {~spi_byte[7], spi_byte[6:0]};
 					end else if (abyte_cnt == 3) begin
 						// third byte is y axis
 						if (stick_idx == 0)
-							JOY_ANA0[7:0] <= {~spi_byte_in[7], spi_byte_in[6:0]};
+							JOY_ANA0[7:0] <= {~spi_byte[7], spi_byte[6:0]};
 						else if (stick_idx == 1)
-							JOY_ANA1[7:0] <= {~spi_byte_in[7], spi_byte_in[6:0]};
+							JOY_ANA1[7:0] <= {~spi_byte[7], spi_byte[6:0]};
 					end
 				end
 
-				8'h22: rtc <= { spi_byte_in, rtc[63:8] };
-				8'h15: status <= spi_byte_in;
+				8'h22: rtc <= { spi_byte, rtc[63:8] };
+				8'h15: status <= spi_byte;
 
 				// I2C bridge
 				8'h30: begin
 					if (abyte_cnt == 1)
-						{ i2c_addr, i2c_read } <= spi_byte_in;
+						{ i2c_addr, i2c_read } <= spi_byte;
 					else if (abyte_cnt == 2)
-						i2c_subaddr <= spi_byte_in;
+						i2c_subaddr <= spi_byte;
 					else if (abyte_cnt == 3) begin
-						i2c_dout <= spi_byte_in;
+						i2c_dout <= spi_byte;
 						i2c_start <= 1;
 					end
 				end
 			endcase
 		end
+
+	end else if (spi_transfer_end && !(spi_receiver_strobeD ^ spi_receiver_strobe)) begin
+		acmd <= 8'd0;
+		abyte_cnt <= 4'd0;
+		eth_mac_wr <= 1'b0;
+		eth_tx_rd <= 1'b0;
+		eth_rx_wr <= 1'b0;
 	end
 end
 
