@@ -8,6 +8,7 @@
 module xsurf
 (
     input             clk,
+    input             clk7_en,
     input             rst,
     input             sel,
     input             cpu_rd,
@@ -16,7 +17,7 @@ module xsurf
     input      [15:1] addr,
     input      [15:0] din,
     output reg [15:0] dout,
-    output            int2,
+    output reg        int2,
 
     output [31:0] eth_status,
     input         eth_mac_wr,
@@ -35,6 +36,7 @@ localparam ETH_BASE = 16'h8600; // port 0x300
 wire sel_eth = (addr[15:6] == ETH_BASE[15:6]);
 wire sel_40h = (addr[7:1] == 7'h20) && !addr[11] && !addr[15];
 
+wire eth_irq;
 wire [15:0] eth_dout;
 wire  [7:0] status = { int2, 1'b0, int2, 5'b0 };
 
@@ -48,6 +50,14 @@ always @(*) begin
             // reg 0x40: status of ethernet irq
             dout = { status, status };
         end
+    end
+end
+
+always @(posedge clk) begin
+    if (rst) begin
+        int2 <= 1'b0;
+    end else if (clk7_en) begin
+        int2 <= eth_irq;
     end
 end
 
@@ -65,7 +75,7 @@ rtl8019 rtl8019_eth
     .din({ din[7:0], din[15:8] }),
     .dout({ eth_dout[7:0], eth_dout[15:8] }),
 
-    .irq(int2),
+    .irq(eth_irq),
     .status(eth_status),
 
     .mac_wr(eth_mac_wr),

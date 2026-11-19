@@ -14,7 +14,7 @@ module rtl8019
 	input      [4:0]  addr,
 	input      [15:0] din,
 	output reg [15:0] dout,
-	output reg        irq,
+	output            irq,
 
 	output     [31:0] status,
 
@@ -359,7 +359,6 @@ always @(posedge clk) begin
 		dcr <= 4'h01; // WTS
 		isr <= 8'h80; // RST
 		imr <= 7'h00;
-		irq <= 1'b0;
 	end else begin
 		if (wr_ne) begin
 			if (!dma_port) begin
@@ -426,9 +425,10 @@ always @(posedge clk) begin
 		end
 		// stop mode
 		isr[7] <= stop & ~tx_rd & ~rx_wr; // RST
-		// interrupt line
-		irq <= |(isr[6:0] & imr) & ~isr[7];
 	end
 end
+
+// interrupt line
+assign irq = |(isr[6:0] & imr);
 
 endmodule

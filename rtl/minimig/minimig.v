@@ -1369,6 +1369,7 @@ assign track_vsync=1'b0;
 xsurf xsurf_eth
 (
   .clk(clk),
+  .clk7_en(clk7_en),
   .rst(reset),
   .sel(sel_xsurf),
   .cpu_rd(cpu_rd),
