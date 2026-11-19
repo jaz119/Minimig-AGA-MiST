@@ -14,7 +14,7 @@ module rtl8019
 	input      [4:0]  addr,
 	input      [15:0] din,
 	output reg [15:0] dout,
-	output reg        irq,
+	output            irq,
 
 	output     [31:0] status,
 
@@ -75,8 +75,9 @@ always @(posedge clk) begin
 	wr_d <= wr;
 end
 
-wire rd_ne = ~rd & rd_d;
-wire wr_ne = ~wr & wr_d;
+wire rd_ne = ~rd &  rd_d;
+wire wr_ne = ~wr &  wr_d;
+wire wr_pe =  wr & ~wr_d;
 
 // spi bus signals
 reg tx_rd_d, rx_wr_d;
@@ -330,7 +331,7 @@ reg [7:0] tx_lo_byte;
 
 // remote DMA data writer
 always @(posedge clk) begin
-	if (wr_ne) begin
+	if (wr_pe) begin
 		if (dma_port && !rbcr_is_0) begin
 			if (wts) begin
 				tx_buffer[rsar[11:1]] <= din;
@@ -359,9 +360,8 @@ always @(posedge clk) begin
 		dcr <= 4'h01; // WTS
 		isr <= 8'h80; // RST
 		imr <= 7'h00;
-		irq <= 1'b0;
 	end else begin
-		if (wr_ne) begin
+		if (wr_pe) begin
 			if (!dma_port) begin
 				// cr is available on all pages
 				if (addr == 0) begin
@@ -426,9 +426,10 @@ always @(posedge clk) begin
 		end
 		// stop mode
 		isr[7] <= stop & ~tx_rd & ~rx_wr; // RST
-		// interrupt line
-		irq <= |(isr[6:0] & imr) & ~isr[7];
 	end
 end
+
+// interrupt line
+assign irq = |(isr[6:0] & imr);
 
 endmodule
