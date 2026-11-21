@@ -106,9 +106,18 @@ always @(posedge clk) begin
 end
 
 // check whether rx ring buffer is full
+wire [7:0] total = pstop - pstart;
 wire [8:0] delta = { 1'b0, curr } - { 1'b0, bnry };
-wire [7:0] used = delta[8] ? (delta[7:0] + (pstop - pstart)) : delta[7:0];
-wire full = (used >= 10);
+wire [7:0] used = delta[8] ? (delta[7:0] + total) : delta[7:0];
+reg  full;
+
+always @(posedge clk) begin
+	if (rst) begin
+		full <= 1'b0;
+	end else begin
+		full <= (used >= 10);
+	end
+end
 
 // syncing i/o controller rx frame traffic
 reg tx_ready;
@@ -408,7 +417,7 @@ always @(posedge clk) begin
 			if (dma_port && !rbcr_is_0) begin
 				rsar <= rsar + { 14'd0, dma_step };
 				rbcr <= next_rbcr;
-				if (next_rbcr == 0) begin
+				if (rbcr == { 9'd0, dma_step }) begin
 					isr[6] <= 1'b1; // RDC
 				end
 			end
