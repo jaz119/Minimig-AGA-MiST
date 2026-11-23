@@ -70,22 +70,18 @@ rtl8019 rtl8019_eth
     .rst(rst),
     .rd(rd),
     .wr(wr),
-
     .addr(addr[5:1]),
     .din({ din[7:0], din[15:8] }),
     .dout({ eth_dout[7:0], eth_dout[15:8] }),
-
     .irq(eth_irq),
-    .status(eth_status),
 
+    .status(eth_status),
     .mac_wr(eth_mac_wr),
     .mac_strobe(eth_mac_strobe),
     .mac_byte(eth_mac_byte),
-
     .tx_rd(eth_tx_rd),
     .tx_strobe(eth_tx_strobe),
     .tx_byte(eth_tx_byte),
-
     .rx_wr(eth_rx_wr),
     .rx_strobe(eth_rx_strobe),
     .rx_byte(eth_rx_byte)

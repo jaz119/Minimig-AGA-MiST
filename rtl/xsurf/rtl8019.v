@@ -59,6 +59,7 @@ wire [1:0] ps = cr[7:6];   // register page select
 wire [1:0] lb = tcr[2:1];  // loopback mode select
 wire wts = dcr[0];         // word transfer select
 wire mon = rcr[5];         // monitor mode
+wire ls = dcr[3];          // loopback select
 
 wire dma_port = (addr[4:3] == 2'b10); // remote DMA ports ($10 - $17)
 wire rst_port = (addr[4:3] == 2'b11); // reset ports ($18 - $1F)
@@ -93,15 +94,17 @@ wire rx_start =  rx_wr & ~rx_wr_d;
 wire rx_stop  = ~rx_wr &  rx_wr_d;
 
 // reset trigger
-reg reset;
+reg  reset, reset_d;
+wire reset_pe = rst || (reset & ~reset_d);
 
 always @(posedge clk) begin
+	reset_d <= reset;
 	if (rst) begin
 		reset <= 1'b0;
-	end else if (rd_ne) begin
-		if (rst_port) reset <= 1'b1;
-	end else if (wr_ne) begin
-		if (rst_port) reset <= 1'b0;
+	end else if (rd_ne && rst_port) begin
+		reset <= 1'b1;
+	end else begin
+		reset <= 1'b0;
 	end
 end
 
@@ -203,7 +206,7 @@ always @(*) begin
 	end
 end
 
-wire is_loop = (lb != 0);
+wire is_loop = ~ls || (lb != 0);
 wire is_prom = (rsar[15:12] == 0);
 
 wire [15:0] dma_word = (is_prom) ? { rom_do, rom_do }
@@ -236,10 +239,13 @@ reg has_wrap;
 
 // local DMA frame receiver
 always @(posedge clk) begin
-	if (rst) begin
+	if (reset_pe) begin
 		rsr <= 8'h00;
 		rx_fin <= 1'b0;
 		rx_fin_d <= 1'b0;
+		has_wrap <= 1'b0;
+		gap_bias <= 4'd0;
+		gap_end <= 6'd0;
 	end else begin
 		rx_fin_d <= rx_fin;
 		if (rx_start) begin
@@ -312,7 +318,7 @@ wire tx_byte_sel = tx_addr[0];
 // local DMA frame transmitter
 always @(posedge clk) begin
 	tx_byte <= (tx_byte_sel) ? tx_buffer_do[15:8] : tx_buffer_do[7:0];
-	if (rst) begin
+	if (reset_pe) begin
 		tsr <= 8'h00;
 	end else begin
 		if (tx_start) begin
@@ -362,7 +368,7 @@ wire [10:0] next_rbcr = rbcr - { 9'd0, dma_step };
 
 // CPU write
 always @(posedge clk) begin
-	if (rst || reset) begin
+	if (reset_pe) begin
 		cr  <= 8'h21; // ABORT, STP
 		rcr <= 6'h20; // MON
 		tcr <= 5'h02; // LB1
