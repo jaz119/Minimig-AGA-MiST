@@ -140,8 +140,8 @@ always @(posedge clk) begin
 	end
 end
 
-reg [7:0] reg_do;
 reg [7:0] rom_do;
+reg [7:0] reg_do;
 
 reg [15:0] rx_buffer_do;
 reg [15:0] tx_buffer_do;
@@ -216,10 +216,8 @@ wire [15:0] dma_do = (wts) ? dma_word : { dma_byte, dma_byte };
 
 // CPU read
 always @(*) begin
-	dout = 16'd0;
-	if (rd) begin
-		dout = (dma_port) ? dma_do : { reg_do, reg_do };
-	end
+	// omitted RD check here to avoid redundant mixing
+	dout = (dma_port) ? dma_do : { reg_do, reg_do };
 end
 
 wire [7:0] next_curr = ((curr + 8'd1) == pstop) ? pstart : (curr + 8'd1);
@@ -234,7 +232,7 @@ reg [11:0] rx_addr;
 reg [10:0] rx_length;
 reg  [7:0] rx_lo_byte;
 reg  [3:0] gap_bias;
-reg  [5:0] gap_end;
+reg  [5:0] gap_stop;
 reg has_wrap;
 
 // local DMA frame receiver
@@ -246,7 +244,7 @@ always @(posedge clk) begin
 		rx_fin_d <= 1'b0;
 		has_wrap <= 1'b0;
 		gap_bias <= 4'd0;
-		gap_end <= 6'd0;
+		gap_stop <= 6'd0;
 	end else if (rx_start) begin
 		rsr <= 8'h00;
 		// +4 for crc
@@ -256,27 +254,25 @@ always @(posedge clk) begin
 		// first page already used
 		clda <= next_curr;
 		has_wrap <= 1'b0;
-	end else if (rx_strobe) begin
+	end else if (rx_strobe && ~rsr[2]) begin
 		if (rx_addr[0] == 1'b0) begin
 			rx_lo_byte <= rx_byte;
 		end else begin
 			rx_buffer[rx_addr[11:1]] <= { rx_byte, rx_lo_byte };
 		end
-		if (!rsr[2]) begin
-			rx_length <= rx_length + 11'd1;
-			// write past pstop boundary
-			rx_addr <= rx_addr + 12'd1;
-			// full page count
-			if (rx_addr[7:0] == 8'hFF) begin
-				clda <= next_clda;
-				if (clda == pstart) begin
-					gap_bias <= (rx_addr[11:8] + 4'd1) - pstart[3:0];
-					has_wrap <= 1'b1;
-				end
+		// full page count
+		if (rx_addr[7:0] == 8'hFF) begin
+			clda <= next_clda;
+			if (clda == pstart) begin
+				gap_bias <= (rx_addr[11:8] + 4'd1) - pstart[3:0];
+				has_wrap <= 1'b1;
 			end
 		end
+		rx_length <= rx_length + 11'd1;
+		// write past pstop boundary
+		rx_addr <= rx_addr + 12'd1;
 		// check max frame limit
-		if (rx_length == 1518) begin
+		if (rx_length == 1522) begin
 			rsr[2] <= 1'b1; // FAE
 		end
 	end else if (rx_stop) begin
@@ -285,15 +281,16 @@ always @(posedge clk) begin
 			rx_buffer[rx_addr[11:1]] <= { 8'h00, rx_lo_byte };
 		end
 		if (has_wrap) begin
-			gap_end <= clda[5:0];
+			gap_stop <= clda[5:0];
 		end else if (clda == pstart) begin
 			// no spillover
-			gap_end <= 6'd0;
+			gap_stop <= 6'd0;
 		end
+		// drop runt and errored frames
+		rx_fin <= (rcr[0] || ~rsr[2]) && (rcr[1] || (rx_length >= 64));
 		// prepare header write
 		rx_addr <= { curr[3:0], 8'd0 };
 		rsr[0] <= ~rsr[2]; // PRX
-		rx_fin <= 1'b1;
 	end else if (rx_fin) begin
 		// writing frame header
 		if (rx_addr[1] == 1'b0) begin
@@ -301,10 +298,6 @@ always @(posedge clk) begin
 			rx_addr[1] <= 1'b1;
 		end else begin
 			rx_buffer[rx_addr[11:1]] <= { 5'h00, rx_length };
-			if (rx_length < 64) begin
-				// drop runt frames
-				rx_fin_d <= rcr[1];
-			end
 			rx_fin <= 1'b0;
 		end
 	end
@@ -330,7 +323,7 @@ always @(posedge clk) begin
 end
 
 // address translation for frame recorded after pstop
-wire use_gap = (rsar[13:8] >= pstart[5:0]) && (rsar[13:8] < gap_end);
+wire use_gap = (rsar[13:8] >= pstart[5:0]) && (rsar[13:8] < gap_stop);
 wire [3:0] phys_rsar = use_gap ? (rsar[11:8] + gap_bias) : rsar[11:8];
 
 // remote DMA data reader
@@ -339,7 +332,8 @@ always @(posedge clk) begin
 	rx_buffer_do <= rx_buffer[{ phys_rsar, rsar[7:1] }];
 end
 
-reg [7:0] tx_lo_byte;
+reg  [7:0] tx_lo_byte;
+wire rbcr_is_0 = (rbcr == 0);
 
 // remote DMA data writer
 always @(posedge clk) begin
@@ -359,9 +353,9 @@ always @(posedge clk) begin
 	end
 end
 
-wire rbcr_is_0 = (rbcr == 0);
-wire  [1:0] dma_step = (wts && (rbcr != 1)) ? 2'd2 : 2'd1;
-wire [10:0] next_rbcr = rbcr - { 9'd0, dma_step };
+wire  [1:0] dma_step = (wts) ? 2'd2 : 2'd1;
+wire [11:0] rbcr_sub = { 1'b0, rbcr } - { 10'd0, dma_step };
+wire [10:0] next_rbcr = (rbcr_sub[11]) ? 11'd0 : rbcr_sub[10:0];
 
 // CPU write
 always @(posedge clk) begin
@@ -416,11 +410,11 @@ always @(posedge clk) begin
 			end
 		end
 		// remote dma operation
-		if (!stop && (wr_ne || rd_ne)) begin
+		if (wr_ne || rd_ne) begin
 			if (dma_port && !rbcr_is_0) begin
 				rsar <= rsar + { 14'd0, dma_step };
 				rbcr <= next_rbcr;
-				if (rbcr == { 9'd0, dma_step }) begin
+				if (next_rbcr == 0) begin
 					isr[6] <= 1'b1; // RDC
 				end
 			end
