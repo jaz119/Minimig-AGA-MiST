@@ -239,6 +239,7 @@ reg has_wrap;
 
 // local DMA frame receiver
 always @(posedge clk) begin
+	rx_fin_d <= rx_fin;
 	if (reset_pe) begin
 		rsr <= 8'h00;
 		rx_fin <= 1'b0;
@@ -246,67 +247,65 @@ always @(posedge clk) begin
 		has_wrap <= 1'b0;
 		gap_bias <= 4'd0;
 		gap_end <= 6'd0;
-	end else begin
-		rx_fin_d <= rx_fin;
-		if (rx_start) begin
-			rsr <= 8'h00;
-			// +4 for crc
-			rx_length <= 11'd4;
-			// +4 for header
-			rx_addr <= { curr[3:0], 8'd4 };
-			// first page already used
-			clda <= next_curr;
-			has_wrap <= 1'b0;
-		end else if (rx_strobe) begin
-			if (rx_addr[0] == 1'b0) begin
-				rx_lo_byte <= rx_byte;
-			end else begin
-				rx_buffer[rx_addr[11:1]] <= { rx_byte, rx_lo_byte };
-			end
-			if (!rsr[2]) begin
-				rx_length <= rx_length + 11'd1;
-				// write past pstop boundary
-				rx_addr <= rx_addr + 12'd1;
-				// full page count
-				if (rx_addr[7:0] == 8'hFF) begin
-					clda <= next_clda;
-					if (clda == pstart) begin
-						gap_bias <= (rx_addr[11:8] + 4'd1) - pstart[3:0];
-						has_wrap <= 1'b1;
-					end
+	end else if (rx_start) begin
+		rsr <= 8'h00;
+		// +4 for crc
+		rx_length <= 11'd4;
+		// +4 for header
+		rx_addr <= { curr[3:0], 8'd4 };
+		// first page already used
+		clda <= next_curr;
+		has_wrap <= 1'b0;
+	end else if (rx_strobe) begin
+		if (rx_addr[0] == 1'b0) begin
+			rx_lo_byte <= rx_byte;
+		end else begin
+			rx_buffer[rx_addr[11:1]] <= { rx_byte, rx_lo_byte };
+		end
+		if (!rsr[2]) begin
+			rx_length <= rx_length + 11'd1;
+			// write past pstop boundary
+			rx_addr <= rx_addr + 12'd1;
+			// full page count
+			if (rx_addr[7:0] == 8'hFF) begin
+				clda <= next_clda;
+				if (clda == pstart) begin
+					gap_bias <= (rx_addr[11:8] + 4'd1) - pstart[3:0];
+					has_wrap <= 1'b1;
 				end
 			end
-			// check max frame limit
-			if (rx_length == 1518) begin
-				rsr[2] <= 1'b1; // FAE
+		end
+		// check max frame limit
+		if (rx_length == 1518) begin
+			rsr[2] <= 1'b1; // FAE
+		end
+	end else if (rx_stop) begin
+		if (rx_addr[0] == 1'b1) begin
+			// last odd byte
+			rx_buffer[rx_addr[11:1]] <= { 8'h00, rx_lo_byte };
+		end
+		if (has_wrap) begin
+			gap_end <= clda[5:0];
+		end else if (clda == pstart) begin
+			// no spillover
+			gap_end <= 6'd0;
+		end
+		// prepare header write
+		rx_addr <= { curr[3:0], 8'd0 };
+		rsr[0] <= ~rsr[2]; // PRX
+		rx_fin <= 1'b1;
+	end else if (rx_fin) begin
+		// writing frame header
+		if (rx_addr[1] == 1'b0) begin
+			rx_buffer[rx_addr[11:1]] <= { clda, rsr };
+			rx_addr[1] <= 1'b1;
+		end else begin
+			rx_buffer[rx_addr[11:1]] <= { 5'h00, rx_length };
+			if (rx_length < 64) begin
+				// drop runt frames
+				rx_fin_d <= rcr[1];
 			end
-		end else if (rx_stop) begin
-			if (rx_addr[0] == 1'b1) begin
-				// last odd byte
-				rx_buffer[rx_addr[11:1]] <= { 8'h00, rx_lo_byte };
-			end
-			// prepare header write
-			rx_addr <= { curr[3:0], 8'd0 };
-			rsr[0] <= ~rsr[2]; // PRX
-			rx_fin <= 1'b1;
-		end else if (rx_fin) begin
-			// writing frame header
-			if (rx_addr[1] == 1'b0) begin
-				rx_buffer[rx_addr[11:1]] <= { clda, rsr };
-				rx_addr[1] <= 1'b1;
-			end else begin
-				rx_buffer[rx_addr[11:1]] <= { 5'h00, rx_length };
-				if (rx_length < 64) begin
-					// allow/drop runt frames
-					rx_fin_d <= rcr[1];
-				end
-				rx_fin <= 1'b0;
-			end
-			if (has_wrap) begin
-				gap_end <= clda[5:0];
-			end else if (clda == pstart) begin
-				gap_end <= pstart[5:0];
-			end
+			rx_fin <= 1'b0;
 		end
 	end
 end
@@ -320,15 +319,13 @@ always @(posedge clk) begin
 	tx_byte <= (tx_byte_sel) ? tx_buffer_do[15:8] : tx_buffer_do[7:0];
 	if (reset_pe) begin
 		tsr <= 8'h00;
-	end else begin
-		if (tx_start) begin
-			tsr[0] <= 1'b0;
-			tx_addr <= { tpsr, 8'd0 };
-		end else if (tx_strobe) begin
-			tx_addr <= tx_addr + 12'd1;
-		end else if (tx_done) begin
-			tsr[0] <= 1'b1; // PTX
-		end
+	end else if (tx_start) begin
+		tsr[0] <= 1'b0;
+		tx_addr <= { tpsr, 8'd0 };
+	end else if (tx_strobe) begin
+		tx_addr <= tx_addr + 12'd1;
+	end else if (tx_done) begin
+		tsr[0] <= 1'b1; // PTX
 	end
 end
 
